@@ -23,7 +23,7 @@ class DriverFactory extends Factory
             'name' => $name,
             'license_number' => $licenseNumber,
             'phone' => '08'.fake()->numberBetween(110000000, 899999999),
-            'status' => fake()->randomElement([DriverStatus::AVAILABLE->value, DriverStatus::AVAILABLE->value, DriverStatus::ON_DUTY->value]),
+            'status' => fake()->randomElement([DriverStatus::ACTIVE->value, DriverStatus::ACTIVE->value, DriverStatus::ASSIGNED->value]),
         ];
     }
 }

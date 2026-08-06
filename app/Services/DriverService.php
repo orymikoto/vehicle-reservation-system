@@ -35,4 +35,29 @@ class DriverService
 
         return $driver;
     }
+
+    public function updateDriver(string $id, array $data, $user): Driver
+    {
+        $driver = Driver::findOrFail($id);
+        $driver->update($data);
+
+        activity()
+            ->causedBy($user)
+            ->performedOn($driver)
+            ->log("Driver updated: {$driver->name}");
+
+        return $driver->fresh(['location']);
+    }
+
+    public function deleteDriver(string $id, $user): bool
+    {
+        $driver = Driver::findOrFail($id);
+
+        activity()
+            ->causedBy($user)
+            ->performedOn($driver)
+            ->log("Driver deleted: {$driver->name}");
+
+        return $driver->delete();
+    }
 }

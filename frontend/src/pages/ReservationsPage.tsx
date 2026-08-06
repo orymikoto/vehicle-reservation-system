@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
-import { Reservation, Vehicle, Driver, User } from '../types';
+import { Reservation, Vehicle, Driver, User, Location } from '../types';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
 import { Plus, Search, CheckCircle2, XCircle, Clock } from 'lucide-react';
@@ -17,11 +17,13 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([]);
   const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
   const [approvers, setApprovers] = useState<User[]>([]);
 
   // Form Fields
+  const [locationId, setLocationId] = useState(currentUser.location_id || '');
   const [vehicleId, setVehicleId] = useState('');
   const [driverId, setDriverId] = useState('');
   const [purpose, setPurpose] = useState('');
@@ -54,17 +56,26 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
     setFormError('');
     setIsModalOpen(true);
     try {
-      const [vehRes, drvRes, appRes] = await Promise.all([
+      const [locRes, vehRes, drvRes, appRes] = await Promise.all([
+        api.get('/locations?active_only=true'),
         api.get('/vehicles/available'),
         api.get('/drivers/available'),
         api.get('/auth/approvers'),
       ]);
-      setAvailableVehicles(vehRes.data.data);
-      setAvailableDrivers(drvRes.data.data);
+
+      setLocations(locRes.data.data);
+      const defaultLoc = currentUser.location_id || (locRes.data.data.length > 0 ? locRes.data.data[0].id : '');
+      setLocationId(defaultLoc);
+
+      const filteredVeh = vehRes.data.data.filter((v: Vehicle) => !defaultLoc || v.location_id === defaultLoc);
+      const filteredDrv = drvRes.data.data.filter((d: Driver) => !defaultLoc || d.location_id === defaultLoc);
+
+      setAvailableVehicles(filteredVeh);
+      setAvailableDrivers(filteredDrv);
       setApprovers(appRes.data.data);
 
-      if (vehRes.data.data.length > 0) setVehicleId(vehRes.data.data[0].id);
-      if (drvRes.data.data.length > 0) setDriverId(drvRes.data.data[0].id);
+      if (filteredVeh.length > 0) setVehicleId(filteredVeh[0].id);
+      if (filteredDrv.length > 0) setDriverId(filteredDrv[0].id);
       if (appRes.data.data.length > 0) setApprover1Id(appRes.data.data[0].id);
       if (appRes.data.data.length > 1) setApprover2Id(appRes.data.data[1].id);
     } catch (err) {
@@ -84,6 +95,7 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
 
     try {
       await api.post('/reservations', {
+        location_id: locationId,
         vehicle_id: vehicleId,
         driver_id: driverId,
         purpose,
@@ -135,7 +147,7 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
           </select>
         </div>
 
-        {currentUser.role === 'ADMIN' && (
+        {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'VEHICLE_ADMIN') && (
           <button onClick={handleOpenCreateModal} className="btn-primary">
             <Plus className="w-4 h-4" />
             New Reservation Request
@@ -149,6 +161,7 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
           <thead>
             <tr className="border-b border-[#E6E6E2] text-xs font-semibold text-[#6B7280] uppercase tracking-wider bg-[#F5F5F3]">
               <th className="py-3 px-4">Code</th>
+              <th className="py-3 px-4">Location</th>
               <th className="py-3 px-4">Vehicle & Driver</th>
               <th className="py-3 px-4">Purpose & Destination</th>
               <th className="py-3 px-4">Schedule</th>
@@ -159,13 +172,13 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
           <tbody className="divide-y divide-[#ECECE8] text-sm bg-white">
             {loading ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-[#6B7280]">
+                <td colSpan={7} className="py-8 text-center text-[#6B7280]">
                   Loading reservations...
                 </td>
               </tr>
             ) : reservations.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-[#6B7280]">
+                <td colSpan={7} className="py-8 text-center text-[#6B7280]">
                   No reservation records found.
                 </td>
               </tr>
@@ -173,6 +186,9 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
               reservations.map((r) => (
                 <tr key={r.id} className="hover:bg-[#F5F5F3] transition-colors">
                   <td className="py-3 px-4 font-bold text-[#18181B]">{r.reservation_code}</td>
+                  <td className="py-3 px-4 text-xs font-semibold text-[#146C43]">
+                    {r.location?.name || 'Unassigned'}
+                  </td>
                   <td className="py-3 px-4">
                     <div className="font-semibold text-[#18181B]">{r.vehicle?.plate_number}</div>
                     <div className="text-xs text-[#6B7280]">
@@ -231,10 +247,28 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
             </div>
           )}
 
+          <div>
+            <label className="block text-xs font-semibold uppercase text-[#6B7280] mb-1">
+              Operational Location
+            </label>
+            <select
+              disabled={currentUser.role !== 'SUPER_ADMIN'}
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              className="w-full h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43]"
+            >
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name} ({loc.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase text-[#6B7280] mb-1">
-                Assign Available Vehicle
+                Assign Available Vehicle (Same Location)
               </label>
               <select
                 value={vehicleId}
@@ -243,7 +277,7 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
               >
                 {availableVehicles.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.plate_number} - {v.brand} {v.model} ({v.type})
+                    {v.plate_number} - {v.brand} {v.model}
                   </option>
                 ))}
               </select>
@@ -251,7 +285,7 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
 
             <div>
               <label className="block text-xs font-semibold uppercase text-[#6B7280] mb-1">
-                Assign Available Driver
+                Assign Available Driver (Same Location)
               </label>
               <select
                 value={driverId}

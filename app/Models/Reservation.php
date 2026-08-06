@@ -19,6 +19,7 @@ class Reservation extends Model
         'user_id',
         'vehicle_id',
         'driver_id',
+        'location_id',
         'purpose',
         'destination',
         'start_datetime',
@@ -52,8 +53,13 @@ class Reservation extends Model
         return $this->belongsTo(Driver::class);
     }
 
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
+    }
+
     public function approvals(): HasMany
     {
-        return $this->hasMany(ReservationApproval::class)->orderBy('approval_level', 'asc');
+        return $this->hasMany(ReservationApproval::class);
     }
 }

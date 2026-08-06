@@ -35,4 +35,29 @@ class VehicleService
 
         return $vehicle;
     }
+
+    public function updateVehicle(string $id, array $data, $user): Vehicle
+    {
+        $vehicle = Vehicle::findOrFail($id);
+        $vehicle->update($data);
+
+        activity()
+            ->causedBy($user)
+            ->performedOn($vehicle)
+            ->log("Vehicle updated: {$vehicle->plate_number}");
+
+        return $vehicle->fresh(['location']);
+    }
+
+    public function deleteVehicle(string $id, $user): bool
+    {
+        $vehicle = Vehicle::findOrFail($id);
+
+        activity()
+            ->causedBy($user)
+            ->performedOn($vehicle)
+            ->log("Vehicle deleted: {$vehicle->plate_number}");
+
+        return $vehicle->delete();
+    }
 }

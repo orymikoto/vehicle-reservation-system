@@ -1,13 +1,21 @@
 <?php
 
 use App\Models\Driver;
+use App\Models\Location;
 use App\Models\User;
 use App\Models\Vehicle;
 
 test('approver 1 approves reservation advancing to level 2', function () {
-    $admin = User::factory()->create(['role' => 'ADMIN']);
-    $approver1 = User::factory()->create(['role' => 'APPROVER']);
-    $approver2 = User::factory()->create(['role' => 'APPROVER']);
+    $location = Location::create([
+        'code' => 'LOC-TST3',
+        'name' => 'Test Location 3',
+        'region' => 'Test Region',
+        'type' => 'MINE',
+    ]);
+
+    $admin = User::factory()->create(['role' => 'SUPER_ADMIN']);
+    $approver1 = User::factory()->create(['role' => 'APPROVER', 'location_id' => $location->id]);
+    $approver2 = User::factory()->create(['role' => 'APPROVER', 'location_id' => $location->id]);
 
     $vehicle = Vehicle::create([
         'plate_number' => 'B 3333 TST',
@@ -16,16 +24,19 @@ test('approver 1 approves reservation advancing to level 2', function () {
         'type' => 'PASSENGER',
         'ownership' => 'COMPANY',
         'status' => 'AVAILABLE',
+        'location_id' => $location->id,
     ]);
 
     $driver = Driver::create([
         'name' => 'Driver Test 3',
         'license_number' => 'SIM-777',
         'phone' => '08333',
-        'status' => 'AVAILABLE',
+        'status' => 'ACTIVE',
+        'location_id' => $location->id,
     ]);
 
     $res = $this->actingAs($admin)->postJson('/api/v1/reservations', [
+        'location_id' => $location->id,
         'vehicle_id' => $vehicle->id,
         'driver_id' => $driver->id,
         'purpose' => 'Mining Survey',
@@ -53,9 +64,16 @@ test('approver 1 approves reservation advancing to level 2', function () {
 });
 
 test('approver 2 grants final approval and sets vehicle status to RESERVED', function () {
-    $admin = User::factory()->create(['role' => 'ADMIN']);
-    $approver1 = User::factory()->create(['role' => 'APPROVER']);
-    $approver2 = User::factory()->create(['role' => 'APPROVER']);
+    $location = Location::create([
+        'code' => 'LOC-TST4',
+        'name' => 'Test Location 4',
+        'region' => 'Test Region',
+        'type' => 'MINE',
+    ]);
+
+    $admin = User::factory()->create(['role' => 'SUPER_ADMIN']);
+    $approver1 = User::factory()->create(['role' => 'APPROVER', 'location_id' => $location->id]);
+    $approver2 = User::factory()->create(['role' => 'APPROVER', 'location_id' => $location->id]);
 
     $vehicle = Vehicle::create([
         'plate_number' => 'B 4444 TST',
@@ -64,16 +82,19 @@ test('approver 2 grants final approval and sets vehicle status to RESERVED', fun
         'type' => 'PASSENGER',
         'ownership' => 'COMPANY',
         'status' => 'AVAILABLE',
+        'location_id' => $location->id,
     ]);
 
     $driver = Driver::create([
         'name' => 'Driver Test 4',
         'license_number' => 'SIM-666',
         'phone' => '08444',
-        'status' => 'AVAILABLE',
+        'status' => 'ACTIVE',
+        'location_id' => $location->id,
     ]);
 
     $res = $this->actingAs($admin)->postJson('/api/v1/reservations', [
+        'location_id' => $location->id,
         'vehicle_id' => $vehicle->id,
         'driver_id' => $driver->id,
         'purpose' => 'Mining Survey',
@@ -108,6 +129,6 @@ test('approver 2 grants final approval and sets vehicle status to RESERVED', fun
 
     $this->assertDatabaseHas('drivers', [
         'id' => $driver->id,
-        'status' => 'ON_DUTY',
+        'status' => 'ASSIGNED',
     ]);
 });

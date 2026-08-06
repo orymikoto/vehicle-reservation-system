@@ -2,142 +2,220 @@
 
 namespace App\Services;
 
+use App\Enums\ApprovalStatus;
+use App\Enums\TransferStatus;
 use App\Enums\VehicleStatus;
+use App\Models\Driver;
 use App\Models\FuelLog;
+use App\Models\Location;
+use App\Models\MaintenanceLog;
 use App\Models\Reservation;
+use App\Models\ReservationApproval;
 use App\Models\Vehicle;
+use App\Models\VehicleTransfer;
 use Illuminate\Support\Facades\DB;
 
 class DashboardService
 {
-    public function getDashboardMetrics(): array
+    public function getDashboardMetrics(?string $locationId = null, string $timeframe = '3_months'): array
     {
-        // 1. Vehicle Counts
-        $totalVehicles = Vehicle::count();
-        $availableVehicles = Vehicle::where('status', VehicleStatus::AVAILABLE->value)->count();
-        $reservedVehicles = Vehicle::where('status', VehicleStatus::RESERVED->value)->count();
-        $maintenanceVehicles = Vehicle::where('status', VehicleStatus::MAINTENANCE->value)->count();
-
         $driver = DB::getDriverName();
 
-        // 2. Monthly Reservations (Past 6 Months)
-        $dateExpr = match ($driver) {
-            'pgsql' => "TO_CHAR(created_at, 'Mon YYYY')",
-            'sqlite' => "strftime('%m-%Y', created_at)",
-            default => "DATE_FORMAT(created_at, '%b %Y')",
+        // Determine date cut-off based on timeframe parameter
+        $cutOffDate = match ($timeframe) {
+            '1_month' => now()->subMonth(),
+            '1_year' => now()->subYear(),
+            '3_years' => now()->subYears(3),
+            default => now()->subMonths(3), // '3_months'
         };
 
-        $monthlyReservationsRaw = Reservation::select(
-            DB::raw("{$dateExpr} as month"),
-            DB::raw('COUNT(*) as total')
-        )
-            ->groupBy('month')
-            ->orderBy(DB::raw('MIN(created_at)'), 'asc')
-            ->limit(6)
-            ->get();
-
-        $monthlyReservations = $monthlyReservationsRaw->map(fn ($item) => [
-            'month' => $item->month,
-            'total' => (int) $item->total,
-        ])->toArray();
-
-        if (empty($monthlyReservations)) {
-            $monthlyReservations = [
-                ['month' => 'Mar 2026', 'total' => 12],
-                ['month' => 'Apr 2026', 'total' => 18],
-                ['month' => 'May 2026', 'total' => 25],
-                ['month' => 'Jun 2026', 'total' => 22],
-                ['month' => 'Jul 2026', 'total' => 31],
-                ['month' => 'Aug 2026', 'total' => 28],
-            ];
+        // 1. Top Cards Vehicle Metrics
+        $vehicleQuery = Vehicle::query();
+        if ($locationId) {
+            $vehicleQuery->where('location_id', $locationId);
         }
 
-        // 3. Vehicle Utilization by Type
-        $utilizationRaw = Vehicle::select('type', DB::raw('COUNT(*) as count'))
-            ->groupBy('type')
-            ->get();
+        $totalVehicles = (clone $vehicleQuery)->count();
+        $availableVehicles = (clone $vehicleQuery)->where('status', VehicleStatus::AVAILABLE->value)->count();
+        $reservedVehicles = (clone $vehicleQuery)->where('status', VehicleStatus::RESERVED->value)->count();
+        $maintenanceVehicles = (clone $vehicleQuery)->where('status', VehicleStatus::MAINTENANCE->value)->count();
+        $inTransferVehicles = (clone $vehicleQuery)->where('status', VehicleStatus::IN_TRANSFER->value)->count();
 
-        $vehicleUtilization = $utilizationRaw->map(fn ($item) => [
-            'type' => is_object($item->type) ? $item->type->value : (string) $item->type,
-            'count' => (int) $item->count,
-        ])->toArray();
+        // 2. Location Summary Cards Grid
+        $locations = Location::where('is_active', true)->orderBy('name', 'asc')->get();
+        $todayStr = now()->format('Y-m-d');
 
-        // 4. Fuel Consumption & Cost
+        $locationSummaries = $locations->map(function ($loc) use ($todayStr) {
+            $vehCount = Vehicle::where('location_id', $loc->id)->count();
+            $drvCount = Driver::where('location_id', $loc->id)->count();
+
+            $rsvToday = Reservation::where('location_id', $loc->id)
+                ->whereDate('start_datetime', '<=', $todayStr)
+                ->whereDate('end_datetime', '>=', $todayStr)
+                ->count();
+
+            $pendingApprovals = ReservationApproval::where('status', ApprovalStatus::PENDING->value)
+                ->whereHas('reservation', function ($q) use ($loc) {
+                    $q->where('location_id', $loc->id);
+                })->count();
+
+            $activeTransfers = VehicleTransfer::where(function ($q) use ($loc) {
+                $q->where('origin_location_id', $loc->id)->orWhere('destination_location_id', $loc->id);
+            })->whereIn('status', [TransferStatus::PENDING_ORIGIN->value, TransferStatus::PENDING_DESTINATION->value])->count();
+
+            return [
+                'id' => $loc->id,
+                'code' => $loc->code,
+                'name' => $loc->name,
+                'region' => $loc->region,
+                'type' => $loc->type->value,
+                'vehicles' => $vehCount,
+                'drivers' => $drvCount,
+                'reservations_today' => $rsvToday,
+                'pending_approvals' => $pendingApprovals,
+                'transfers' => $activeTransfers,
+            ];
+        })->toArray();
+
+        // 3. Fuel Consumption & Cost Trend (by month over timeframe)
         $fuelDateExpr = match ($driver) {
             'pgsql' => "TO_CHAR(fuel_date, 'Mon YYYY')",
             'sqlite' => "strftime('%m-%Y', fuel_date)",
             default => "DATE_FORMAT(fuel_date, '%b %Y')",
         };
 
-        $fuelConsumptionRaw = FuelLog::select(
+        $fuelQuery = FuelLog::select(
             DB::raw("{$fuelDateExpr} as month"),
             DB::raw('SUM(fuel_amount) as liters'),
             DB::raw('SUM(fuel_cost) as cost')
-        )
+        )->where('fuel_date', '>=', $cutOffDate->format('Y-m-d'));
+
+        if ($locationId) {
+            $fuelQuery->whereHas('vehicle', fn ($q) => $q->where('location_id', $locationId));
+        }
+
+        $fuelLogsRaw = $fuelQuery
             ->groupBy('month')
             ->orderBy(DB::raw('MIN(fuel_date)'), 'asc')
-            ->limit(6)
             ->get();
 
-        $fuelConsumption = $fuelConsumptionRaw->map(fn ($item) => [
+        $fuelTrend = $fuelLogsRaw->map(fn ($item) => [
             'month' => $item->month,
-            'liters' => (float) $item->liters,
+            'liters' => round((float) $item->liters, 1),
             'cost' => (float) $item->cost,
         ])->toArray();
 
-        if (empty($fuelConsumption)) {
-            $fuelConsumption = [
-                ['month' => 'Mar 2026', 'liters' => 1450, 'cost' => 18850000],
-                ['month' => 'Apr 2026', 'liters' => 1620, 'cost' => 21060000],
-                ['month' => 'May 2026', 'liters' => 1890, 'cost' => 24570000],
-                ['month' => 'Jun 2026', 'liters' => 1740, 'cost' => 22620000],
-                ['month' => 'Jul 2026', 'liters' => 2100, 'cost' => 27300000],
-                ['month' => 'Aug 2026', 'liters' => 1950, 'cost' => 25350000],
-            ];
+        // 4. Maintenance Expenses Trend (by month over timeframe)
+        $maintDateExpr = match ($driver) {
+            'pgsql' => "TO_CHAR(service_date, 'Mon YYYY')",
+            'sqlite' => "strftime('%m-%Y', service_date)",
+            default => "DATE_FORMAT(service_date, '%b %Y')",
+        };
+
+        $maintQuery = MaintenanceLog::select(
+            DB::raw("{$maintDateExpr} as month"),
+            DB::raw('SUM(cost) as cost')
+        )->where('service_date', '>=', $cutOffDate->format('Y-m-d'));
+
+        if ($locationId) {
+            $maintQuery->whereHas('vehicle', fn ($q) => $q->where('location_id', $locationId));
         }
 
-        // 5. Reservation Status Distribution
-        $statusRaw = Reservation::select('status', DB::raw('COUNT(*) as count'))
-            ->groupBy('status')
+        $maintLogsRaw = $maintQuery
+            ->groupBy('month')
+            ->orderBy(DB::raw('MIN(service_date)'), 'asc')
             ->get();
 
-        $reservationStatusDistribution = $statusRaw->map(fn ($item) => [
-            'status' => is_object($item->status) ? $item->status->value : (string) $item->status,
-            'count' => (int) $item->count,
+        $maintenanceTrend = $maintLogsRaw->map(fn ($item) => [
+            'month' => $item->month,
+            'cost' => (float) $item->cost,
         ])->toArray();
 
-        if (empty($reservationStatusDistribution)) {
-            $reservationStatusDistribution = [
-                ['status' => 'APPROVED', 'count' => 45],
-                ['status' => 'PENDING', 'count' => 12],
-                ['status' => 'REJECTED', 'count' => 5],
-                ['status' => 'COMPLETED', 'count' => 38],
+        // 5. Total Combined Expenses Trend (Fuel Cost + Maintenance Cost per month)
+        $monthMap = [];
+        foreach ($fuelTrend as $f) {
+            $monthMap[$f['month']] = ($monthMap[$f['month']] ?? 0) + $f['cost'];
+        }
+        foreach ($maintenanceTrend as $m) {
+            $monthMap[$m['month']] = ($monthMap[$m['month']] ?? 0) + $m['cost'];
+        }
+
+        $combinedExpensesTrend = [];
+        foreach ($monthMap as $monthName => $totalCost) {
+            $combinedExpensesTrend[] = [
+                'month' => $monthName,
+                'total_expense' => $totalCost,
             ];
         }
 
-        // 6. Top Used Vehicles
-        $topUsedVehicles = Vehicle::withCount('reservations')
-            ->orderBy('reservations_count', 'desc')
-            ->limit(5)
+        // 6. Expense Distribution (Percentage of Total Outcome: Fuel vs Maintenance)
+        $totalFuelCost = array_sum(array_column($fuelTrend, 'cost'));
+        $totalMaintenanceCost = array_sum(array_column($maintenanceTrend, 'cost'));
+        $grandTotalExpense = $totalFuelCost + $totalMaintenanceCost;
+
+        $fuelPercentage = $grandTotalExpense > 0 ? round(($totalFuelCost / $grandTotalExpense) * 100, 1) : 0;
+        $maintenancePercentage = $grandTotalExpense > 0 ? round(($totalMaintenanceCost / $grandTotalExpense) * 100, 1) : 0;
+
+        $expenseDistribution = [
+            'fuel_cost' => $totalFuelCost,
+            'maintenance_cost' => $totalMaintenanceCost,
+            'grand_total' => $grandTotalExpense,
+            'fuel_percentage' => $fuelPercentage,
+            'maintenance_percentage' => $maintenancePercentage,
+        ];
+
+        // 7. Sites with Most Fuel Money Spent (Ranking)
+        $siteFuelQuery = Location::where('is_active', true);
+        if ($locationId) {
+            $siteFuelQuery->where('id', $locationId);
+        }
+
+        $topFuelSites = $siteFuelQuery->get()->map(function ($loc) use ($cutOffDate) {
+            $totalFuel = FuelLog::whereHas('vehicle', fn ($q) => $q->where('location_id', $loc->id))
+                ->where('fuel_date', '>=', $cutOffDate->format('Y-m-d'))
+                ->sum('fuel_cost');
+
+            $totalLiters = FuelLog::whereHas('vehicle', fn ($q) => $q->where('location_id', $loc->id))
+                ->where('fuel_date', '>=', $cutOffDate->format('Y-m-d'))
+                ->sum('fuel_amount');
+
+            return [
+                'id' => $loc->id,
+                'code' => $loc->code,
+                'name' => $loc->name,
+                'region' => $loc->region,
+                'total_fuel_cost' => (float) $totalFuel,
+                'total_liters' => round((float) $totalLiters, 1),
+            ];
+        })->sortByDesc('total_fuel_cost')->values()->toArray();
+
+        // 8. Vehicle Utilization by Type
+        $utilQuery = Vehicle::select('type', DB::raw('COUNT(*) as count'));
+        if ($locationId) {
+            $utilQuery->where('location_id', $locationId);
+        }
+
+        $vehicleUtilization = $utilQuery
+            ->groupBy('type')
             ->get()
-            ->map(fn ($vehicle) => [
-                'plate_number' => $vehicle->plate_number,
-                'brand' => $vehicle->brand,
-                'model' => $vehicle->model,
-                'trip_count' => $vehicle->reservations_count,
-            ])
-            ->toArray();
+            ->map(fn ($item) => [
+                'type' => is_object($item->type) ? $item->type->value : (string) $item->type,
+                'count' => (int) $item->count,
+            ])->toArray();
 
         return [
             'total_vehicles' => $totalVehicles,
             'available_vehicles' => $availableVehicles,
             'reserved_vehicles' => $reservedVehicles,
             'maintenance_vehicles' => $maintenanceVehicles,
-            'monthly_reservations' => $monthlyReservations,
+            'in_transfer_vehicles' => $inTransferVehicles,
+            'location_summaries' => $locationSummaries,
+            'combined_expenses_trend' => $combinedExpensesTrend,
+            'fuel_trend' => $fuelTrend,
+            'maintenance_trend' => $maintenanceTrend,
+            'expense_distribution' => $expenseDistribution,
+            'top_fuel_sites' => $topFuelSites,
             'vehicle_utilization' => $vehicleUtilization,
-            'fuel_consumption' => $fuelConsumption,
-            'reservation_status_distribution' => $reservationStatusDistribution,
-            'top_used_vehicles' => $topUsedVehicles,
         ];
     }
 }

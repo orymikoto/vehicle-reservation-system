@@ -4,18 +4,21 @@ namespace Database\Seeders;
 
 use App\Enums\ApprovalStatus;
 use App\Enums\DriverStatus;
+use App\Enums\LocationType;
 use App\Enums\ReservationStatus;
+use App\Enums\TransferStatus;
 use App\Enums\UserRole;
-use App\Enums\VehicleOwnership;
 use App\Enums\VehicleStatus;
-use App\Enums\VehicleType;
 use App\Models\Driver;
+use App\Models\DriverTransfer;
 use App\Models\FuelLog;
+use App\Models\Location;
 use App\Models\MaintenanceLog;
 use App\Models\Reservation;
 use App\Models\ReservationApproval;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\VehicleTransfer;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -24,215 +27,212 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // Disable activity log during batch seeding for high speed execution
         activity()->disableLogging();
 
-        // 1. Core Users (Admin & Regional Approvers)
-        $admin = User::create([
-            'name' => 'MineFleet Admin',
+        // 1. Operational Locations (1 HQ, 1 Branch, 6 Mine Sites)
+        $locationsData = [
+            ['code' => 'LOC-HQ', 'name' => 'Headquarters', 'region' => 'Jakarta HQ', 'address' => 'Gedung Menara Mining Lt. 24, Jakarta', 'type' => LocationType::HEADQUARTERS->value],
+            ['code' => 'LOC-BO', 'name' => 'Branch Office', 'region' => 'East Kalimantan Branch', 'address' => 'Jl. Jendral Sudirman No. 88, Balikpapan', 'type' => LocationType::BRANCH->value],
+            ['code' => 'LOC-MSA', 'name' => 'Mine Site A', 'region' => 'Kutai Timur Pit Alpha', 'address' => 'Sangatta Mining Complex Sector 1', 'type' => LocationType::MINE->value],
+            ['code' => 'LOC-MSB', 'name' => 'Mine Site B', 'region' => 'Kutai Barat Pit Bravo', 'address' => 'Sendawar Heavy Duty Camp', 'type' => LocationType::MINE->value],
+            ['code' => 'LOC-MSC', 'name' => 'Mine Site C', 'region' => 'Berau Washing Plant', 'address' => 'Tanjung Redeb Logistics Port', 'type' => LocationType::MINE->value],
+            ['code' => 'LOC-MSD', 'name' => 'Mine Site D', 'region' => 'Tabalong Sector 4', 'address' => 'Tanjung Mining Corridor KM 45', 'type' => LocationType::MINE->value],
+            ['code' => 'LOC-MSE', 'name' => 'Mine Site E', 'region' => 'Banjar Jetty Terminal', 'address' => 'Banjarmasin Coal Shipping Hub', 'type' => LocationType::MINE->value],
+            ['code' => 'LOC-MSF', 'name' => 'Mine Site F', 'region' => 'Sangatta Pit Delta', 'address' => 'Sangatta North Excavation Pit', 'type' => LocationType::MINE->value],
+        ];
+
+        $locations = collect();
+        foreach ($locationsData as $locData) {
+            $locations->push(Location::create($locData));
+        }
+
+        $mineSiteA = $locations->firstWhere('code', 'LOC-MSA');
+        $mineSiteB = $locations->firstWhere('code', 'LOC-MSB');
+
+        // 2. Users (Super Admin, Vehicle Admins, Approvers)
+        $superAdmin = User::create([
+            'name' => 'MineFleet Super Admin',
             'email' => 'admin@minefleet.com',
             'password' => Hash::make('password'),
-            'role' => UserRole::ADMIN->value,
+            'role' => UserRole::SUPER_ADMIN->value,
+            'location_id' => null,
         ]);
 
         $approver1 = User::create([
-            'name' => 'Hasan - Region Manager (L1)',
+            'name' => 'Hasan - Mine Site A Manager (L1)',
             'email' => 'approver1@minefleet.com',
             'password' => Hash::make('password'),
             'role' => UserRole::APPROVER->value,
+            'location_id' => $mineSiteA->id,
         ]);
 
         $approver2 = User::create([
-            'name' => 'Dewi - Logistics Director (L2)',
+            'name' => 'Dewi - Mine Site A Director (L2)',
             'email' => 'approver2@minefleet.com',
             'password' => Hash::make('password'),
             'role' => UserRole::APPROVER->value,
+            'location_id' => $mineSiteA->id,
         ]);
 
-        // Generate 9 more regional approvers (Total 12 users)
-        $additionalApprovers = User::factory()->count(9)->create([
-            'role' => UserRole::APPROVER->value,
-        ]);
+        $vehicleAdmins = collect();
+        $allApprovers = collect([$approver1, $approver2]);
 
-        $allApprovers = collect([$approver1, $approver2])->concat($additionalApprovers);
+        foreach ($locations as $loc) {
+            $vAdmin = User::create([
+                'name' => "Fleet Admin ({$loc->code})",
+                'email' => strtolower("admin.{$loc->code}@minefleet.com"),
+                'password' => Hash::make('password'),
+                'role' => UserRole::VEHICLE_ADMIN->value,
+                'location_id' => $loc->id,
+            ]);
+            $vehicleAdmins->push($vAdmin);
 
-        // 2. Vehicles (60 vehicles)
-        $vehicles = Vehicle::factory()->count(60)->create();
+            if ($loc->id !== $mineSiteA->id) {
+                $l1 = User::create([
+                    'name' => "Approver L1 ({$loc->name})",
+                    'email' => strtolower("approver1.{$loc->code}@minefleet.com"),
+                    'password' => Hash::make('password'),
+                    'role' => UserRole::APPROVER->value,
+                    'location_id' => $loc->id,
+                ]);
 
-        // 3. Drivers (50 drivers)
-        $drivers = Driver::factory()->count(50)->create();
+                $l2 = User::create([
+                    'name' => "Approver L2 ({$loc->name})",
+                    'email' => strtolower("approver2.{$loc->code}@minefleet.com"),
+                    'password' => Hash::make('password'),
+                    'role' => UserRole::APPROVER->value,
+                    'location_id' => $loc->id,
+                ]);
 
-        // 4. Fuel Logs (100 logs across vehicles)
-        for ($i = 0; $i < 100; $i++) {
-            $v = $vehicles->random();
-            $d = $drivers->random();
-            $amount = fake()->randomFloat(2, 45, 400);
-            $cost = round($amount * fake()->randomFloat(2, 13800, 15500), 2);
-            $date = fake()->dateTimeBetween('-6 months', 'now')->format('Y-m-d');
+                $allApprovers->push($l1)->push($l2);
+            }
+        }
+
+        // 3. Vehicles & Drivers per Location (12 vehicles & 10 drivers per location = 96 vehicles, 80 drivers)
+        $allVehicles = collect();
+        $allDrivers = collect();
+
+        foreach ($locations as $loc) {
+            $locVehicles = Vehicle::factory()->count(12)->create(['location_id' => $loc->id]);
+            $locDrivers = Driver::factory()->count(10)->create(['location_id' => $loc->id]);
+
+            $allVehicles = $allVehicles->concat($locVehicles);
+            $allDrivers = $allDrivers->concat($locDrivers);
+        }
+
+        // 4. Fuel & Maintenance Logs
+        foreach ($allVehicles as $v) {
+            $d = $allDrivers->where('location_id', $v->location_id)->first() ?? $allDrivers->first();
 
             FuelLog::create([
                 'vehicle_id' => $v->id,
                 'driver_id' => $d->id,
-                'fuel_date' => $date,
-                'fuel_amount' => $amount,
-                'fuel_cost' => $cost,
-                'odometer' => fake()->numberBetween(10000, 150000),
-                'notes' => fake()->randomElement([
-                    'Refueling at Pit 1 Pertamina Station',
-                    'Refueling at Site Alpha Mobile Tanker',
-                    'Refueling at Port Jetty Fuel Depot',
-                    'Refueling at Washing Plant Fuel Hub',
-                    'Refueling at Pit 3 Fuel Storage Bay',
-                ]),
+                'fuel_date' => fake()->dateTimeBetween('-3 months', 'now')->format('Y-m-d'),
+                'fuel_amount' => round(fake()->randomFloat(1, 50, 300), 1),
+                'fuel_cost' => fake()->numberBetween(7500, 45000) * 100,
+                'odometer' => fake()->numberBetween(15000, 120000),
+                'notes' => 'Site fueling station refill',
             ]);
-        }
-
-        // 5. Maintenance Logs (50 logs across vehicles)
-        for ($i = 0; $i < 50; $i++) {
-            $v = $vehicles->random();
-            $serviceDate = fake()->dateTimeBetween('-6 months', 'now');
-            $nextDate = (clone $serviceDate)->modify('+3 months');
 
             MaintenanceLog::create([
                 'vehicle_id' => $v->id,
-                'service_date' => $serviceDate->format('Y-m-d'),
-                'service_type' => fake()->randomElement(['ROUTINE', 'ROUTINE', 'REPAIR', 'EMERGENCY']),
-                'workshop' => fake()->randomElement([
-                    'United Tractors Service Center',
-                    'Trakindo Utama Mining Workshop',
-                    'Hexindo Adiperkasa Technical Hub',
-                    'Auto2000 Commercial Site Bay',
-                    'Protek Mining Heavy Machinery Repairs',
-                ]),
-                'cost' => fake()->numberBetween(1500000, 25000000),
-                'next_service_date' => $nextDate->format('Y-m-d'),
-                'notes' => fake()->randomElement([
-                    'Routine 20,000 KM service & oil filter replacement',
-                    'Engine oil change, air filter swap, and brake pad inspection',
-                    'Hydraulic fluid flushing and hose replacement',
-                    'Heavy duty off-road tire replacement & wheel alignment',
-                    'Transmission overhaul & clutch plate replacement',
-                ]),
+                'service_date' => fake()->dateTimeBetween('-3 months', 'now')->format('Y-m-d'),
+                'service_type' => 'ROUTINE',
+                'workshop' => 'Authorized Site Service Bay',
+                'cost' => fake()->numberBetween(15000, 120000) * 100,
+                'next_service_date' => now()->addMonths(3)->format('Y-m-d'),
+                'notes' => 'Routine 10,000 KM heavy duty maintenance',
             ]);
         }
 
-        // 6. Reservations (80 reservations with 160 approval steps)
-        $purposes = [
-            'Geological Pit Survey & Core Sampling',
-            'Coal Haulage Inspection & Road Maintenance',
-            'Mining Safety Audit & Environmental Compliance',
-            'Exploration Core Sample Transport to Lab',
-            'Executive Director Site Inspection',
-            'Heavy Equipment Maintenance Technician Escort',
-            'Emergency Medical Relief Field Patrol',
-            'Explosives & Blasting Zone Patrol',
-        ];
+        // 5. Reservations per Location (10 per location = 80 reservations)
+        foreach ($locations as $loc) {
+            $locVehicles = $allVehicles->where('location_id', $loc->id)->values();
+            $locDrivers = $allDrivers->where('location_id', $loc->id)->values();
+            $locApprovers = $allApprovers->where('location_id', $loc->id)->values();
+            $vAdmin = $vehicleAdmins->where('location_id', $loc->id)->first() ?? $superAdmin;
 
-        $destinations = [
-            'Pit Alpha Block 4',
-            'Pit Bravo Sector 12',
-            'Port Jetty Terminal 2',
-            'Coal Washing Plant Sector C',
-            'Exploration Camp Bravo',
-            'Central Workshop Bay',
-            'Haul Road KM 45 Checkpoint',
-        ];
+            $l1App = $locApprovers->first() ?? $approver1;
+            $l2App = $locApprovers->skip(1)->first() ?? $approver2;
 
-        for ($i = 1; $i <= 80; $i++) {
-            $vehicle = $vehicles->random();
-            $driver = $drivers->random();
+            for ($r = 1; $r <= 10; $r++) {
+                $v = $locVehicles->random();
+                $d = $locDrivers->random();
+                $startDate = fake()->dateTimeBetween('-2 months', '+2 weeks');
+                $endDate = (clone $startDate)->modify('+8 hours');
 
-            // First 5 pending reservations specifically assign approver1 as L1 and approver2 as L2
-            if ($i <= 5) {
-                $l1Approver = $approver1;
-                $l2Approver = $approver2;
-                $status = ReservationStatus::PENDING->value;
-                $currentLevel = 1;
-            } elseif ($i <= 10) {
-                $l1Approver = $approver1;
-                $l2Approver = $approver2;
-                $status = ReservationStatus::PENDING->value;
-                $currentLevel = 2; // Level 1 already approved, waiting for Level 2 (approver2)
-            } else {
-                $l1Approver = $allApprovers->random();
-                $l2Approver = $allApprovers->where('id', '!=', $l1Approver->id)->random();
-                $startDate = fake()->dateTimeBetween('-5 months', '+2 weeks');
-
-                if ($startDate < new \DateTime()) {
-                    $status = fake()->boolean(80) ? ReservationStatus::APPROVED->value : ReservationStatus::REJECTED->value;
+                if ($r <= 3) {
+                    $status = ReservationStatus::PENDING->value;
+                    $level = 1;
+                } elseif ($r <= 5) {
+                    $status = ReservationStatus::PENDING->value;
+                    $level = 2;
                 } else {
-                    $status = fake()->randomElement([
-                        ReservationStatus::PENDING->value,
-                        ReservationStatus::APPROVED->value,
-                        ReservationStatus::REJECTED->value,
-                    ]);
+                    $status = ReservationStatus::APPROVED->value;
+                    $level = 2;
                 }
-                $currentLevel = $status === ReservationStatus::APPROVED->value ? 2 : 1;
+
+                $reservation = Reservation::create([
+                    'reservation_code' => 'RSV-'.$startDate->format('Ymd').'-'.strtoupper(Str::random(4)),
+                    'user_id' => $vAdmin->id,
+                    'vehicle_id' => $v->id,
+                    'driver_id' => $d->id,
+                    'location_id' => $loc->id,
+                    'purpose' => "Site Operational Inspection ({$loc->code})",
+                    'destination' => "Pit Sector {$r}",
+                    'start_datetime' => $startDate->format('Y-m-d H:i:s'),
+                    'end_datetime' => $endDate->format('Y-m-d H:i:s'),
+                    'status' => $status,
+                    'current_approval_level' => $level,
+                ]);
+
+                ReservationApproval::create([
+                    'reservation_id' => $reservation->id,
+                    'approver_id' => $l1App->id,
+                    'approval_level' => 1,
+                    'status' => ($r <= 3) ? ApprovalStatus::PENDING->value : ApprovalStatus::APPROVED->value,
+                    'notes' => 'Level 1 operational check',
+                    'approved_at' => ($r <= 3) ? null : $startDate,
+                ]);
+
+                ReservationApproval::create([
+                    'reservation_id' => $reservation->id,
+                    'approver_id' => $l2App->id,
+                    'approval_level' => 2,
+                    'status' => ($r <= 5) ? ApprovalStatus::PENDING->value : ApprovalStatus::APPROVED->value,
+                    'notes' => 'Level 2 logistics clearance',
+                    'approved_at' => ($r <= 5) ? null : $startDate,
+                ]);
             }
-
-            $startDate = fake()->dateTimeBetween('-5 months', '+2 weeks');
-            $endDate = (clone $startDate)->modify('+'.fake()->numberBetween(4, 12).' hours');
-            $code = 'RSV-'.$startDate->format('Ymd').'-'.strtoupper(Str::random(4));
-
-            $reservation = Reservation::create([
-                'reservation_code' => $code,
-                'user_id' => $admin->id,
-                'vehicle_id' => $vehicle->id,
-                'driver_id' => $driver->id,
-                'purpose' => fake()->randomElement($purposes),
-                'destination' => fake()->randomElement($destinations),
-                'start_datetime' => $startDate->format('Y-m-d H:i:s'),
-                'end_datetime' => $endDate->format('Y-m-d H:i:s'),
-                'status' => $status,
-                'current_approval_level' => $currentLevel,
-            ]);
-
-            // Level 1 Approval Step
-            if ($i <= 5) {
-                $l1Status = ApprovalStatus::PENDING->value;
-            } elseif ($i <= 10) {
-                $l1Status = ApprovalStatus::APPROVED->value;
-            } else {
-                $l1Status = match ($status) {
-                    ReservationStatus::APPROVED->value => ApprovalStatus::APPROVED->value,
-                    ReservationStatus::REJECTED->value => fake()->boolean(50) ? ApprovalStatus::REJECTED->value : ApprovalStatus::APPROVED->value,
-                    default => ApprovalStatus::PENDING->value,
-                };
-            }
-
-            ReservationApproval::create([
-                'reservation_id' => $reservation->id,
-                'approver_id' => $l1Approver->id,
-                'approval_level' => 1,
-                'status' => $l1Status,
-                'notes' => $l1Status === ApprovalStatus::APPROVED->value ? 'Verified operational necessity' : ($l1Status === ApprovalStatus::REJECTED->value ? 'Conflict with regional maintenance schedule' : null),
-                'approved_at' => $l1Status !== ApprovalStatus::PENDING->value ? $startDate : null,
-            ]);
-
-            // Level 2 Approval Step
-            if ($i <= 5) {
-                $l2Status = ApprovalStatus::PENDING->value;
-            } elseif ($i <= 10) {
-                $l2Status = ApprovalStatus::PENDING->value; // Waiting for Level 2 decision
-            } else {
-                $l2Status = match ($status) {
-                    ReservationStatus::APPROVED->value => ApprovalStatus::APPROVED->value,
-                    ReservationStatus::REJECTED->value => ($l1Status === ApprovalStatus::APPROVED->value) ? ApprovalStatus::REJECTED->value : ApprovalStatus::PENDING->value,
-                    default => ApprovalStatus::PENDING->value,
-                };
-            }
-
-            ReservationApproval::create([
-                'reservation_id' => $reservation->id,
-                'approver_id' => $l2Approver->id,
-                'approval_level' => 2,
-                'status' => $l2Status,
-                'notes' => $l2Status === ApprovalStatus::APPROVED->value ? 'Final logistics authorization granted' : ($l2Status === ApprovalStatus::REJECTED->value ? 'Vehicle reallocation requested for priority pit operation' : null),
-                'approved_at' => $l2Status !== ApprovalStatus::PENDING->value ? $startDate : null,
-            ]);
         }
 
-        // Re-enable activity logging after seeding
+        // 6. Inter-Location Vehicle Transfers & Driver Transfers
+        $transferVehicle = $allVehicles->where('location_id', $mineSiteA->id)->first();
+        VehicleTransfer::create([
+            'vehicle_id' => $transferVehicle->id,
+            'origin_location_id' => $mineSiteA->id,
+            'destination_location_id' => $mineSiteB->id,
+            'requested_by' => $superAdmin->id,
+            'origin_approved_by' => $approver1->id,
+            'destination_approved_by' => null,
+            'status' => TransferStatus::PENDING_DESTINATION->value,
+            'remarks' => 'Reallocating heavy excavator to Mine Site B for new pit excavation',
+        ]);
+        $transferVehicle->update(['status' => VehicleStatus::IN_TRANSFER->value]);
+
+        $transferDriver = $allDrivers->where('location_id', $mineSiteA->id)->first();
+        DriverTransfer::create([
+            'driver_id' => $transferDriver->id,
+            'origin_location_id' => $mineSiteA->id,
+            'destination_location_id' => $mineSiteB->id,
+            'requested_by' => $superAdmin->id,
+            'origin_approved_by' => null,
+            'destination_approved_by' => null,
+            'status' => TransferStatus::PENDING_ORIGIN->value,
+            'remarks' => 'Transferring experienced SIM-B2 driver for heavy haulage operations',
+        ]);
+        $transferDriver->update(['status' => DriverStatus::TRANSFERRED->value]);
+
         activity()->enableLogging();
     }
 }

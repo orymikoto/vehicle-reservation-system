@@ -10,9 +10,13 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ReservationRepository implements ReservationRepositoryInterface
 {
-    public function getAllPaginated(int $perPage = 15, ?string $search = null, ?string $status = null): LengthAwarePaginator
+    public function getAllPaginated(int $perPage = 15, ?string $search = null, ?string $status = null, ?string $locationId = null): LengthAwarePaginator
     {
-        $query = Reservation::with(['user', 'vehicle', 'driver', 'approvals.approver']);
+        $query = Reservation::with(['user', 'vehicle', 'driver', 'location', 'approvals.approver']);
+
+        if ($locationId) {
+            $query->where('location_id', $locationId);
+        }
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -31,7 +35,7 @@ class ReservationRepository implements ReservationRepositoryInterface
 
     public function findById(string $id): ?Reservation
     {
-        return Reservation::with(['user', 'vehicle', 'driver', 'approvals.approver'])->find($id);
+        return Reservation::with(['user', 'vehicle', 'driver', 'location', 'approvals.approver'])->find($id);
     }
 
     public function create(CreateReservationDTO $dto, string $reservationCode): Reservation
@@ -41,6 +45,7 @@ class ReservationRepository implements ReservationRepositoryInterface
             'user_id' => $dto->userId,
             'vehicle_id' => $dto->vehicleId,
             'driver_id' => $dto->driverId,
+            'location_id' => $dto->locationId,
             'purpose' => $dto->purpose,
             'destination' => $dto->destination,
             'start_datetime' => $dto->startDatetime,

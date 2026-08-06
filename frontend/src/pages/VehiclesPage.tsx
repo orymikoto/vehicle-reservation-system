@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
-import { Vehicle, User } from '../types';
+import { Vehicle, User, Location } from '../types';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
-import { Plus, Search, Truck } from 'lucide-react';
+import { Plus, Search, Truck, Edit, Trash2 } from 'lucide-react';
 
 interface VehiclesPageProps {
   currentUser: User;
@@ -11,17 +11,22 @@ interface VehiclesPageProps {
 
 export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
   // Modal Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+
   const [plateNumber, setPlateNumber] = useState('');
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [type, setType] = useState('PASSENGER');
   const [ownership, setOwnership] = useState('COMPANY');
+  const [status, setStatus] = useState('AVAILABLE');
+  const [locationId, setLocationId] = useState(currentUser.location_id || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -42,30 +47,94 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
     }
   };
 
-  const handleCreateVehicle = async (e: React.FormEvent) => {
+  const handleOpenAddModal = async () => {
+    setEditingVehicle(null);
+    setPlateNumber('');
+    setBrand('');
+    setModel('');
+    setType('PASSENGER');
+    setOwnership('COMPANY');
+    setStatus('AVAILABLE');
+    setLocationId(currentUser.location_id || '');
+    setError('');
+    setIsModalOpen(true);
+    fetchLocations();
+  };
+
+  const handleOpenEditModal = async (v: Vehicle) => {
+    setEditingVehicle(v);
+    setPlateNumber(v.plate_number);
+    setBrand(v.brand);
+    setModel(v.model);
+    setType(v.type);
+    setOwnership(v.ownership);
+    setStatus(v.status);
+    setLocationId(v.location_id || currentUser.location_id || '');
+    setError('');
+    setIsModalOpen(true);
+    fetchLocations();
+  };
+
+  const fetchLocations = async () => {
+    try {
+      const res = await api.get('/locations?active_only=true');
+      setLocations(res.data.data);
+    } catch (err) {
+      console.error('Failed to load locations', err);
+    }
+  };
+
+  const handleSaveVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError('');
 
     try {
-      await api.post('/vehicles', {
-        plate_number: plateNumber,
-        brand,
-        model,
-        type,
-        ownership,
-      });
+      if (editingVehicle) {
+        await api.put(`/vehicles/${editingVehicle.id}`, {
+          plate_number: plateNumber,
+          brand,
+          model,
+          type,
+          ownership,
+          status,
+          location_id: locationId,
+        });
+      } else {
+        await api.post('/vehicles', {
+          plate_number: plateNumber,
+          brand,
+          model,
+          type,
+          ownership,
+          location_id: locationId,
+        });
+      }
 
       setIsModalOpen(false);
-      setPlateNumber('');
-      setBrand('');
-      setModel('');
       fetchVehicles();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to add vehicle.');
+      setError(err.response?.data?.message || 'Failed to save vehicle.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleDeleteVehicle = async (v: Vehicle) => {
+    if (!confirm(`Are you sure you want to delete vehicle ${v.plate_number}?`)) return;
+
+    try {
+      await api.delete(`/vehicles/${v.id}`);
+      fetchVehicles();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete vehicle.');
+    }
+  };
+
+  const canManageVehicle = (v: Vehicle) => {
+    if (currentUser.role === 'SUPER_ADMIN') return true;
+    if (currentUser.role === 'VEHICLE_ADMIN' && currentUser.location_id === v.location_id) return true;
+    return false;
   };
 
   return (
@@ -93,11 +162,12 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
             <option value="AVAILABLE">AVAILABLE</option>
             <option value="RESERVED">RESERVED</option>
             <option value="MAINTENANCE">MAINTENANCE</option>
+            <option value="IN_TRANSFER">IN_TRANSFER</option>
           </select>
         </div>
 
-        {currentUser.role === 'ADMIN' && (
-          <button onClick={() => setIsModalOpen(true)} className="btn-primary">
+        {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'VEHICLE_ADMIN') && (
+          <button onClick={handleOpenAddModal} className="btn-primary">
             <Plus className="w-4 h-4" />
             Add Fleet Vehicle
           </button>
@@ -110,22 +180,24 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
           <thead>
             <tr className="border-b border-[#E6E6E2] text-xs font-semibold text-[#6B7280] uppercase tracking-wider bg-[#F5F5F3]">
               <th className="py-3 px-4">Plate Number</th>
+              <th className="py-3 px-4">Assigned Location</th>
               <th className="py-3 px-4">Brand & Model</th>
               <th className="py-3 px-4">Vehicle Type</th>
               <th className="py-3 px-4">Ownership</th>
               <th className="py-3 px-4">Status</th>
+              <th className="py-3 px-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#ECECE8] text-sm bg-white">
             {loading ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-[#6B7280]">
+                <td colSpan={7} className="py-8 text-center text-[#6B7280]">
                   Loading fleet vehicles...
                 </td>
               </tr>
             ) : vehicles.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-[#6B7280]">
+                <td colSpan={7} className="py-8 text-center text-[#6B7280]">
                   No vehicles found in fleet registry.
                 </td>
               </tr>
@@ -135,6 +207,9 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
                   <td className="py-3 px-4 font-bold text-[#18181B] flex items-center gap-2">
                     <Truck className="w-4 h-4 text-[#146C43]" />
                     {v.plate_number}
+                  </td>
+                  <td className="py-3 px-4 text-xs font-semibold text-[#146C43]">
+                    {v.location?.name || 'Unassigned'}
                   </td>
                   <td className="py-3 px-4 text-[#18181B] font-medium">
                     {v.brand} {v.model}
@@ -146,6 +221,26 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
                   <td className="py-3 px-4">
                     <Badge status={v.status} />
                   </td>
+                  <td className="py-3 px-4 text-right space-x-2">
+                    {canManageVehicle(v) && (
+                      <>
+                        <button
+                          onClick={() => handleOpenEditModal(v)}
+                          title="Edit Vehicle"
+                          className="p-1.5 text-[#6B7280] hover:text-[#146C43] hover:bg-[#F5F5F3] rounded-lg transition-colors"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteVehicle(v)}
+                          title="Delete Vehicle"
+                          className="p-1.5 text-[#6B7280] hover:text-[#DC2626] hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+                  </td>
                 </tr>
               ))
             )}
@@ -153,18 +248,36 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
         </table>
       </div>
 
-      {/* Add Vehicle Modal */}
+      {/* Add / Edit Vehicle Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Add Fleet Vehicle to Registry"
+        title={editingVehicle ? 'Edit Fleet Vehicle Details' : 'Add Fleet Vehicle to Registry'}
       >
-        <form onSubmit={handleCreateVehicle} className="space-y-4">
+        <form onSubmit={handleSaveVehicle} className="space-y-4">
           {error && (
             <div className="p-3 rounded-lg bg-red-50 text-red-700 text-xs font-medium border border-red-200">
               {error}
             </div>
           )}
+
+          <div>
+            <label className="block text-xs font-semibold uppercase text-[#6B7280] mb-1">
+              Operational Location
+            </label>
+            <select
+              disabled={currentUser.role !== 'SUPER_ADMIN'}
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              className="w-full h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43]"
+            >
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name} ({loc.code})
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase text-[#6B7280] mb-1">
@@ -242,6 +355,25 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
             </div>
           </div>
 
+          {editingVehicle && (
+            <div>
+              <label className="block text-xs font-semibold uppercase text-[#6B7280] mb-1">
+                Status
+              </label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43]"
+              >
+                <option value="AVAILABLE">AVAILABLE</option>
+                <option value="RESERVED">RESERVED</option>
+                <option value="MAINTENANCE">MAINTENANCE</option>
+                <option value="IN_TRANSFER">IN_TRANSFER</option>
+                <option value="INACTIVE">INACTIVE</option>
+              </select>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 border-t border-[#ECECE8] pt-4">
             <button
               type="button"
@@ -251,7 +383,7 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
               Cancel
             </button>
             <button type="submit" disabled={submitting} className="btn-primary">
-              {submitting ? 'Saving...' : 'Save Vehicle'}
+              {submitting ? 'Saving...' : editingVehicle ? 'Update Vehicle' : 'Save Vehicle'}
             </button>
           </div>
         </form>

@@ -8,7 +8,7 @@ class CreateReservationRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->isAdmin();
+        return $this->user()->isSuperAdmin() || $this->user()->isVehicleAdmin();
     }
 
     public function rules(): array
@@ -16,6 +16,7 @@ class CreateReservationRequest extends FormRequest
         return [
             'vehicle_id' => ['required', 'uuid', 'exists:vehicles,id'],
             'driver_id' => ['required', 'uuid', 'exists:drivers,id'],
+            'location_id' => ['required', 'uuid', 'exists:locations,id'],
             'purpose' => ['required', 'string', 'max:255'],
             'destination' => ['required', 'string', 'max:255'],
             'start_datetime' => ['required', 'date', 'after:now'],

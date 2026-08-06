@@ -1,16 +1,31 @@
-export type UserRole = 'ADMIN' | 'APPROVER';
+export type LocationType = 'HEADQUARTERS' | 'BRANCH' | 'MINE';
+
+export interface Location {
+  id: string;
+  code: string;
+  name: string;
+  region: string;
+  address?: string;
+  type: LocationType;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export type UserRole = 'SUPER_ADMIN' | 'VEHICLE_ADMIN' | 'APPROVER';
 
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
+  location_id?: string | null;
+  location?: Location;
   created_at?: string;
 }
 
 export type VehicleType = 'PASSENGER' | 'CARGO' | 'HEAVY_EQUIPMENT' | 'AMBULANCE';
 export type VehicleOwnership = 'COMPANY' | 'RENTAL';
-export type VehicleStatus = 'AVAILABLE' | 'RESERVED' | 'MAINTENANCE' | 'INACTIVE';
+export type VehicleStatus = 'AVAILABLE' | 'RESERVED' | 'MAINTENANCE' | 'IN_TRANSFER' | 'INACTIVE';
 
 export interface Vehicle {
   id: string;
@@ -20,10 +35,12 @@ export interface Vehicle {
   type: VehicleType;
   ownership: VehicleOwnership;
   status: VehicleStatus;
+  location_id?: string;
+  location?: Location;
   created_at?: string;
 }
 
-export type DriverStatus = 'AVAILABLE' | 'ON_DUTY' | 'INACTIVE';
+export type DriverStatus = 'ACTIVE' | 'ASSIGNED' | 'ON_LEAVE' | 'TRANSFERRED';
 
 export interface Driver {
   id: string;
@@ -31,6 +48,50 @@ export interface Driver {
   license_number: string;
   phone: string;
   status: DriverStatus;
+  location_id?: string;
+  location?: Location;
+  created_at?: string;
+}
+
+export type TransferStatus = 'PENDING_ORIGIN' | 'PENDING_DESTINATION' | 'COMPLETED' | 'REJECTED';
+
+export interface VehicleTransfer {
+  id: string;
+  vehicle_id: string;
+  vehicle?: Vehicle;
+  origin_location_id: string;
+  origin_location?: Location;
+  destination_location_id: string;
+  destination_location?: Location;
+  requested_by: string;
+  requester?: User;
+  origin_approved_by?: string;
+  origin_approver?: User;
+  destination_approved_by?: string;
+  destination_approver?: User;
+  status: TransferStatus;
+  remarks?: string;
+  transferred_at?: string;
+  created_at?: string;
+}
+
+export interface DriverTransfer {
+  id: string;
+  driver_id: string;
+  driver?: Driver;
+  origin_location_id: string;
+  origin_location?: Location;
+  destination_location_id: string;
+  destination_location?: Location;
+  requested_by: string;
+  requester?: User;
+  origin_approved_by?: string;
+  origin_approver?: User;
+  destination_approved_by?: string;
+  destination_approver?: User;
+  status: TransferStatus;
+  remarks?: string;
+  transferred_at?: string;
   created_at?: string;
 }
 
@@ -58,6 +119,8 @@ export interface Reservation {
   vehicle?: Vehicle;
   driver_id: string;
   driver?: Driver;
+  location_id: string;
+  location?: Location;
   purpose: string;
   destination: string;
   start_datetime: string;
@@ -106,14 +169,47 @@ export interface ActivityLog {
   created_at: string;
 }
 
+export interface LocationSummary {
+  id: string;
+  code: string;
+  name: string;
+  region: string;
+  type: LocationType;
+  vehicles: number;
+  drivers: number;
+  reservations_today: number;
+  pending_approvals: number;
+  transfers: number;
+}
+
+export interface ExpenseDistribution {
+  fuel_cost: number;
+  maintenance_cost: number;
+  grand_total: number;
+  fuel_percentage: number;
+  maintenance_percentage: number;
+}
+
+export interface TopFuelSite {
+  id: string;
+  code: string;
+  name: string;
+  region: string;
+  total_fuel_cost: number;
+  total_liters: number;
+}
+
 export interface DashboardMetrics {
   total_vehicles: number;
   available_vehicles: number;
   reserved_vehicles: number;
   maintenance_vehicles: number;
-  monthly_reservations: { month: string; total: number }[];
+  in_transfer_vehicles: number;
+  location_summaries: LocationSummary[];
+  combined_expenses_trend: { month: string; total_expense: number }[];
+  fuel_trend: { month: string; liters: number; cost: number }[];
+  maintenance_trend: { month: string; cost: number }[];
+  expense_distribution: ExpenseDistribution;
+  top_fuel_sites: TopFuelSite[];
   vehicle_utilization: { type: string; count: number }[];
-  fuel_consumption: { month: string; liters: number; cost: number }[];
-  reservation_status_distribution: { status: string; count: number }[];
-  top_used_vehicles: { plate_number: string; brand: string; model: string; trip_count: number }[];
 }

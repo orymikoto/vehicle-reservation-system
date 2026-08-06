@@ -8,6 +8,7 @@ use App\Enums\VehicleType;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -22,6 +23,7 @@ class Vehicle extends Model
         'type',
         'ownership',
         'status',
+        'location_id',
     ];
 
     protected function casts(): array
@@ -31,6 +33,11 @@ class Vehicle extends Model
             'ownership' => VehicleOwnership::class,
             'status' => VehicleStatus::class,
         ];
+    }
+
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 
     public function reservations(): HasMany
@@ -46,5 +53,10 @@ class Vehicle extends Model
     public function maintenanceLogs(): HasMany
     {
         return $this->hasMany(MaintenanceLog::class);
+    }
+
+    public function transfers(): HasMany
+    {
+        return $this->hasMany(VehicleTransfer::class);
     }
 }

@@ -1,13 +1,21 @@
 <?php
 
 use App\Models\Driver;
+use App\Models\Location;
 use App\Models\User;
 use App\Models\Vehicle;
 
 test('admin can create a reservation with level 1 and level 2 approvers', function () {
-    $admin = User::factory()->create(['role' => 'ADMIN']);
-    $approver1 = User::factory()->create(['role' => 'APPROVER']);
-    $approver2 = User::factory()->create(['role' => 'APPROVER']);
+    $location = Location::create([
+        'code' => 'LOC-TST1',
+        'name' => 'Test Location 1',
+        'region' => 'Test Region',
+        'type' => 'MINE',
+    ]);
+
+    $admin = User::factory()->create(['role' => 'SUPER_ADMIN']);
+    $approver1 = User::factory()->create(['role' => 'APPROVER', 'location_id' => $location->id]);
+    $approver2 = User::factory()->create(['role' => 'APPROVER', 'location_id' => $location->id]);
 
     $vehicle = Vehicle::create([
         'plate_number' => 'B 1111 TST',
@@ -16,16 +24,19 @@ test('admin can create a reservation with level 1 and level 2 approvers', functi
         'type' => 'PASSENGER',
         'ownership' => 'COMPANY',
         'status' => 'AVAILABLE',
+        'location_id' => $location->id,
     ]);
 
     $driver = Driver::create([
         'name' => 'Driver Test',
         'license_number' => 'SIM-999',
         'phone' => '08111',
-        'status' => 'AVAILABLE',
+        'status' => 'ACTIVE',
+        'location_id' => $location->id,
     ]);
 
     $response = $this->actingAs($admin)->postJson('/api/v1/reservations', [
+        'location_id' => $location->id,
         'vehicle_id' => $vehicle->id,
         'driver_id' => $driver->id,
         'purpose' => 'Mining Survey',
@@ -59,8 +70,15 @@ test('admin can create a reservation with level 1 and level 2 approvers', functi
 });
 
 test('creation fails if level 1 and level 2 approvers are identical', function () {
-    $admin = User::factory()->create(['role' => 'ADMIN']);
-    $approver = User::factory()->create(['role' => 'APPROVER']);
+    $location = Location::create([
+        'code' => 'LOC-TST2',
+        'name' => 'Test Location 2',
+        'region' => 'Test Region',
+        'type' => 'MINE',
+    ]);
+
+    $admin = User::factory()->create(['role' => 'SUPER_ADMIN']);
+    $approver = User::factory()->create(['role' => 'APPROVER', 'location_id' => $location->id]);
 
     $vehicle = Vehicle::create([
         'plate_number' => 'B 2222 TST',
@@ -69,16 +87,19 @@ test('creation fails if level 1 and level 2 approvers are identical', function (
         'type' => 'PASSENGER',
         'ownership' => 'COMPANY',
         'status' => 'AVAILABLE',
+        'location_id' => $location->id,
     ]);
 
     $driver = Driver::create([
         'name' => 'Driver Test 2',
         'license_number' => 'SIM-888',
         'phone' => '08222',
-        'status' => 'AVAILABLE',
+        'status' => 'ACTIVE',
+        'location_id' => $location->id,
     ]);
 
     $response = $this->actingAs($admin)->postJson('/api/v1/reservations', [
+        'location_id' => $location->id,
         'vehicle_id' => $vehicle->id,
         'driver_id' => $driver->id,
         'purpose' => 'Mining Survey',

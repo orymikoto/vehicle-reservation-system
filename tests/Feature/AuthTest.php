@@ -6,7 +6,7 @@ test('admin can log in with valid credentials', function () {
     $user = User::factory()->create([
         'email' => 'admin_test@minefleet.com',
         'password' => bcrypt('password123'),
-        'role' => 'ADMIN',
+        'role' => 'SUPER_ADMIN',
     ]);
 
     $response = $this->postJson('/api/v1/auth/login', [
@@ -26,7 +26,7 @@ test('login fails with invalid password', function () {
     User::factory()->create([
         'email' => 'admin_test2@minefleet.com',
         'password' => bcrypt('password123'),
-        'role' => 'ADMIN',
+        'role' => 'SUPER_ADMIN',
     ]);
 
     $response = $this->postJson('/api/v1/auth/login', [

@@ -5,11 +5,14 @@ use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DriverController;
+use App\Http\Controllers\Api\DriverTransferController;
 use App\Http\Controllers\Api\FuelController;
+use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\MaintenanceController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReservationController;
 use App\Http\Controllers\Api\VehicleController;
+use App\Http\Controllers\Api\VehicleTransferController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -28,6 +31,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/auth/approvers', [AuthController::class, 'approvers']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
 
+        // Location Management
+        Route::get('/locations', [LocationController::class, 'index']);
+        Route::post('/locations', [LocationController::class, 'store']);
+        Route::put('/locations/{id}', [LocationController::class, 'update']);
+
         // Dashboard Metrics
         Route::get('/dashboard', [DashboardController::class, 'index']);
 
@@ -35,11 +43,29 @@ Route::prefix('v1')->group(function () {
         Route::get('/vehicles', [VehicleController::class, 'index']);
         Route::get('/vehicles/available', [VehicleController::class, 'available']);
         Route::post('/vehicles', [VehicleController::class, 'store']);
+        Route::put('/vehicles/{id}', [VehicleController::class, 'update']);
+        Route::delete('/vehicles/{id}', [VehicleController::class, 'destroy']);
 
         // Driver Management
         Route::get('/drivers', [DriverController::class, 'index']);
         Route::get('/drivers/available', [DriverController::class, 'available']);
         Route::post('/drivers', [DriverController::class, 'store']);
+        Route::put('/drivers/{id}', [DriverController::class, 'update']);
+        Route::delete('/drivers/{id}', [DriverController::class, 'destroy']);
+
+        // Vehicle Transfers (Inter-Location)
+        Route::get('/transfers/vehicles', [VehicleTransferController::class, 'index']);
+        Route::post('/transfers/vehicles', [VehicleTransferController::class, 'store']);
+        Route::post('/transfers/vehicles/{id}/approve-origin', [VehicleTransferController::class, 'approveOrigin']);
+        Route::post('/transfers/vehicles/{id}/approve-destination', [VehicleTransferController::class, 'approveDestination']);
+        Route::post('/transfers/vehicles/{id}/reject', [VehicleTransferController::class, 'reject']);
+
+        // Driver Transfers (Inter-Location)
+        Route::get('/transfers/drivers', [DriverTransferController::class, 'index']);
+        Route::post('/transfers/drivers', [DriverTransferController::class, 'store']);
+        Route::post('/transfers/drivers/{id}/approve-origin', [DriverTransferController::class, 'approveOrigin']);
+        Route::post('/transfers/drivers/{id}/approve-destination', [DriverTransferController::class, 'approveDestination']);
+        Route::post('/transfers/drivers/{id}/reject', [DriverTransferController::class, 'reject']);
 
         // Reservation Management
         Route::get('/reservations', [ReservationController::class, 'index']);

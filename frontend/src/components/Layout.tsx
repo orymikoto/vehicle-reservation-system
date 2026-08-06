@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   CalendarCheck,
@@ -14,14 +14,20 @@ import {
   User as UserIcon,
   Menu,
   X,
+  ArrowLeftRight,
+  MapPin,
+  Building2,
 } from 'lucide-react';
-import { User } from '../types';
+import { User, Location } from '../types';
+import api from '../services/api';
 
 interface LayoutProps {
   user: User;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   onLogout: () => void;
+  selectedLocationId?: string;
+  onLocationChange?: (locationId: string) => void;
   children: React.ReactNode;
 }
 
@@ -30,9 +36,20 @@ export const Layout: React.FC<LayoutProps> = ({
   activeTab,
   setActiveTab,
   onLogout,
+  selectedLocationId = '',
+  onLocationChange,
   children,
 }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [locations, setLocations] = useState<Location[]>([]);
+
+  useEffect(() => {
+    if (user.role === 'SUPER_ADMIN') {
+      api.get('/locations?active_only=true')
+        .then((res) => setLocations(res.data.data))
+        .catch((err) => console.error('Failed to load locations', err));
+    }
+  }, [user]);
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -40,12 +57,15 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'approvals', label: 'Approvals', icon: CheckSquare },
     { id: 'vehicles', label: 'Fleet Vehicles', icon: Truck },
     { id: 'drivers', label: 'Drivers', icon: Users },
+    { id: 'vehicle-transfers', label: 'Vehicle Transfers', icon: ArrowLeftRight },
+    { id: 'driver-transfers', label: 'Driver Transfers', icon: ArrowLeftRight },
     { id: 'fuel', label: 'Fuel Logs', icon: Fuel },
     { id: 'maintenance', label: 'Maintenance', icon: Wrench },
     { id: 'reports', label: 'Reports & Export', icon: FileSpreadsheet },
   ];
 
-  if (user.role === 'ADMIN') {
+  if (user.role === 'SUPER_ADMIN') {
+    navItems.push({ id: 'locations', label: 'Location Management', icon: Building2 });
     navItems.push({ id: 'audit-logs', label: 'Audit Logs', icon: History });
   }
 
@@ -64,7 +84,7 @@ export const Layout: React.FC<LayoutProps> = ({
         />
       )}
 
-      {/* Sidebar (Desktop static & Mobile drawer) */}
+      {/* Sidebar */}
       <aside
         className={`fixed md:static inset-y-0 left-0 z-50 w-[280px] bg-white border-r border-[#E6E6E2] flex flex-col justify-between p-6 transition-transform duration-200 ease-in-out ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
@@ -79,7 +99,7 @@ export const Layout: React.FC<LayoutProps> = ({
               </div>
               <div>
                 <h1 className="text-lg font-bold tracking-tight text-[#18181B]">MineFleet</h1>
-                <p className="text-xs text-[#6B7280]">Vehicle Reservation System</p>
+                <p className="text-xs text-[#6B7280]">Mining Fleet Operations</p>
               </div>
             </div>
             <button
@@ -147,7 +167,6 @@ export const Layout: React.FC<LayoutProps> = ({
         {/* Header Bar */}
         <header className="h-[72px] bg-white border-b border-[#E6E6E2] px-4 md:px-8 flex items-center justify-between sticky top-0 z-30">
           <div className="flex items-center gap-3">
-            {/* Hamburger Button for Mobile */}
             <button
               onClick={() => setIsMobileOpen(true)}
               className="p-2 text-[#6B7280] hover:text-[#18181B] hover:bg-[#F5F5F3] rounded-lg md:hidden transition-colors"
@@ -162,10 +181,31 @@ export const Layout: React.FC<LayoutProps> = ({
               </h2>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-xs font-semibold px-3 py-1 bg-emerald-50 text-[#146C43] border border-emerald-200 rounded-full">
-              Mining Fleet Active
-            </span>
+
+          {/* Global Location Selector / Badge */}
+          <div className="flex items-center gap-3">
+            {user.role === 'SUPER_ADMIN' ? (
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-[#146C43]" />
+                <select
+                  value={selectedLocationId}
+                  onChange={(e) => onLocationChange && onLocationChange(e.target.value)}
+                  className="text-xs font-medium bg-[#FAFAF8] text-[#18181B] border border-[#E6E6E2] rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#146C43]"
+                >
+                  <option value="">All Locations (Global)</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name} ({loc.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <span className="text-xs font-semibold px-3 py-1.5 bg-emerald-50 text-[#146C43] border border-emerald-200 rounded-full flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[#146C43]" />
+                {user.location?.name || 'Assigned Location'}
+              </span>
+            )}
           </div>
         </header>
 

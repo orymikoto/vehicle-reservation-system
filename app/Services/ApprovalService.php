@@ -73,7 +73,7 @@ class ApprovalService
                 // Final Approval
                 $this->reservationRepository->updateStatus($reservation->id, ReservationStatus::APPROVED->value);
                 $this->vehicleRepository->updateStatus($reservation->vehicle_id, VehicleStatus::RESERVED->value);
-                $this->driverRepository->updateStatus($reservation->driver_id, DriverStatus::ON_DUTY->value);
+                $this->driverRepository->updateStatus($reservation->driver_id, DriverStatus::ASSIGNED->value);
 
                 activity()
                     ->causedBy($approver)

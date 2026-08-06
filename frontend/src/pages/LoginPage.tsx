@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../services/api';
 import { User } from '../types';
-import { ShieldCheck, UserCheck, AlertCircle } from 'lucide-react';
+import { ShieldCheck, UserCheck, AlertCircle, Building2 } from 'lucide-react';
 
 interface LoginPageProps {
   onLoginSuccess: (user: User, token: string) => void;
@@ -42,7 +42,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             M
           </div>
           <h2 className="text-2xl font-bold text-[#18181B]">MineFleet Portal</h2>
-          <p className="text-sm text-[#6B7280]">Vehicle Reservation & Approval System</p>
+          <p className="text-sm text-[#6B7280]">Multi-Location Mining Fleet System</p>
         </div>
 
         {error && (
@@ -94,27 +94,38 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider mb-3 text-center">
             Demo Account Credentials
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => handleQuickSelect('admin@minefleet.com')}
-              className="p-2.5 rounded-lg border border-[#E6E6E2] text-xs text-left hover:bg-[#F5F5F3] transition-colors flex flex-col gap-1"
+              className="p-2 rounded-lg border border-[#E6E6E2] text-xs text-left hover:bg-[#F5F5F3] transition-colors flex flex-col gap-0.5"
             >
               <div className="flex items-center gap-1 font-semibold text-[#18181B]">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#146C43]" />
-                Admin Account
+                <ShieldCheck className="w-3 h-3 text-[#146C43]" />
+                Super Admin
               </div>
-              <span className="text-[11px] text-[#6B7280] truncate">admin@minefleet.com</span>
+              <span className="text-[10px] text-[#6B7280] truncate">admin@minefleet.com</span>
+            </button>
+
+            <button
+              onClick={() => handleQuickSelect('admin.loc-msa@minefleet.com')}
+              className="p-2 rounded-lg border border-[#E6E6E2] text-xs text-left hover:bg-[#F5F5F3] transition-colors flex flex-col gap-0.5"
+            >
+              <div className="flex items-center gap-1 font-semibold text-[#18181B]">
+                <Building2 className="w-3 h-3 text-[#146C43]" />
+                Site Admin
+              </div>
+              <span className="text-[10px] text-[#6B7280] truncate">admin.loc-msa@minefleet.com</span>
             </button>
 
             <button
               onClick={() => handleQuickSelect('approver1@minefleet.com')}
-              className="p-2.5 rounded-lg border border-[#E6E6E2] text-xs text-left hover:bg-[#F5F5F3] transition-colors flex flex-col gap-1"
+              className="p-2 rounded-lg border border-[#E6E6E2] text-xs text-left hover:bg-[#F5F5F3] transition-colors flex flex-col gap-0.5"
             >
               <div className="flex items-center gap-1 font-semibold text-[#18181B]">
-                <UserCheck className="w-3.5 h-3.5 text-[#146C43]" />
-                Level 1 Approver
+                <UserCheck className="w-3 h-3 text-[#146C43]" />
+                Approver L1
               </div>
-              <span className="text-[11px] text-[#6B7280] truncate">approver1@minefleet.com</span>
+              <span className="text-[10px] text-[#6B7280] truncate">approver1@minefleet.com</span>
             </button>
           </div>
         </div>

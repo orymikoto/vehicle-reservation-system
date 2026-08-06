@@ -94,7 +94,7 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({ currentUser })
           </p>
         </div>
 
-        {currentUser.role === 'ADMIN' && (
+        {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'VEHICLE_ADMIN') && (
           <button onClick={handleOpenModal} className="btn-primary">
             <Plus className="w-4 h-4" />
             Record Service Event

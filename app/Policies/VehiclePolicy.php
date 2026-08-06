@@ -19,16 +19,16 @@ class VehiclePolicy
 
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->isSuperAdmin() || $user->isVehicleAdmin();
     }
 
     public function update(User $user, Vehicle $vehicle): bool
     {
-        return $user->isAdmin();
+        return $user->isSuperAdmin() || ($user->isVehicleAdmin() && $user->location_id === $vehicle->location_id);
     }
 
     public function delete(User $user, Vehicle $vehicle): bool
     {
-        return $user->isAdmin();
+        return $user->isSuperAdmin() || ($user->isVehicleAdmin() && $user->location_id === $vehicle->location_id);
     }
 }

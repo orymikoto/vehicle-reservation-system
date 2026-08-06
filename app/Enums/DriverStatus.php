@@ -4,7 +4,8 @@ namespace App\Enums;
 
 enum DriverStatus: string
 {
-    case AVAILABLE = 'AVAILABLE';
-    case ON_DUTY = 'ON_DUTY';
-    case INACTIVE = 'INACTIVE';
+    case ACTIVE = 'ACTIVE';
+    case ASSIGNED = 'ASSIGNED';
+    case ON_LEAVE = 'ON_LEAVE';
+    case TRANSFERRED = 'TRANSFERRED';
 }

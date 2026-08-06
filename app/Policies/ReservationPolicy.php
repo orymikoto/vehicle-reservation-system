@@ -14,11 +14,15 @@ class ReservationPolicy
 
     public function view(User $user, Reservation $reservation): bool
     {
-        return true;
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        return $reservation->location_id === $user->location_id;
     }
 
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->isSuperAdmin() || $user->isVehicleAdmin();
     }
 }
