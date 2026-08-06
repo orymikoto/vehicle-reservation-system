@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
-import { Vehicle, User, Location } from '../types';
+import { Vehicle, User, Location, PaginatedMeta } from '../types';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
-import { Plus, Search, Truck, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Truck, Edit, Trash2, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 
 interface VehiclesPageProps {
   currentUser: User;
@@ -13,8 +13,22 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filter, Sort, Pagination states
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState<PaginatedMeta>({
+    current_page: 1,
+    last_page: 1,
+    per_page: 15,
+    total: 0,
+    from: 0,
+    to: 0,
+  });
 
   // Modal Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,15 +45,49 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (currentUser.role === 'SUPER_ADMIN') {
+      fetchLocations();
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
     fetchVehicles();
-  }, [search, statusFilter]);
+  }, [search, statusFilter, locationFilter, sortBy, sortDirection, page]);
+
+  const fetchLocations = async () => {
+    try {
+      const res = await api.get('/locations?active_only=true');
+      setLocations(res.data.data);
+    } catch (err) {
+      console.error('Failed to load locations', err);
+    }
+  };
 
   const fetchVehicles = async () => {
     try {
+      setLoading(true);
       const res = await api.get('/vehicles', {
-        params: { search, status: statusFilter },
+        params: {
+          search,
+          status: statusFilter,
+          location_id: locationFilter,
+          sort_by: sortBy,
+          sort_direction: sortDirection,
+          page,
+          per_page: 15,
+        },
       });
-      setVehicles(res.data.data.data || res.data.data);
+
+      const paginatedData = res.data.data;
+      setVehicles(paginatedData.data || []);
+      setMeta({
+        current_page: paginatedData.current_page || 1,
+        last_page: paginatedData.last_page || 1,
+        per_page: paginatedData.per_page || 15,
+        total: paginatedData.total || 0,
+        from: paginatedData.from || 0,
+        to: paginatedData.to || 0,
+      });
     } catch (err) {
       console.error('Failed to load vehicles', err);
     } finally {
@@ -55,10 +103,9 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
     setType('PASSENGER');
     setOwnership('COMPANY');
     setStatus('AVAILABLE');
-    setLocationId(currentUser.location_id || '');
+    setLocationId(currentUser.location_id || locations[0]?.id || '');
     setError('');
     setIsModalOpen(true);
-    fetchLocations();
   };
 
   const handleOpenEditModal = async (v: Vehicle) => {
@@ -69,19 +116,9 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
     setType(v.type);
     setOwnership(v.ownership);
     setStatus(v.status);
-    setLocationId(v.location_id || currentUser.location_id || '');
+    setLocationId(v.location_id || currentUser.location_id || locations[0]?.id || '');
     setError('');
     setIsModalOpen(true);
-    fetchLocations();
-  };
-
-  const fetchLocations = async () => {
-    try {
-      const res = await api.get('/locations?active_only=true');
-      setLocations(res.data.data);
-    } catch (err) {
-      console.error('Failed to load locations', err);
-    }
   };
 
   const handleSaveVehicle = async (e: React.FormEvent) => {
@@ -139,23 +176,31 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      {/* Search, Filter, Sort Header Bar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Search Input */}
           <div className="relative w-64">
             <Search className="w-4 h-4 absolute left-3 top-3 text-[#6B7280]" />
             <input
               type="text"
               placeholder="Search plate, brand, model..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               className="w-full pl-9 pr-3 h-10 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43]"
             />
           </div>
 
+          {/* Status Filter */}
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
             className="h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43]"
           >
             <option value="">All Statuses</option>
@@ -164,6 +209,46 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
             <option value="MAINTENANCE">MAINTENANCE</option>
             <option value="IN_TRANSFER">IN_TRANSFER</option>
           </select>
+
+          {/* Site Location Filter - Super Admin Only */}
+          {currentUser.role === 'SUPER_ADMIN' && (
+            <select
+              value={locationFilter}
+              onChange={(e) => {
+                setLocationFilter(e.target.value);
+                setPage(1);
+              }}
+              className="h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43]"
+            >
+              <option value="">All Mine Sites</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name} ({loc.code})
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Sort By Dropdown */}
+          <div className="flex items-center gap-1 bg-white border border-[#E6E6E2] rounded-lg h-10 px-2">
+            <ArrowUpDown className="w-3.5 h-3.5 text-[#6B7280]" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="h-full bg-transparent text-sm focus:outline-none pr-1"
+            >
+              <option value="created_at">Date Added</option>
+              <option value="plate_number">Plate Number</option>
+              <option value="brand">Brand</option>
+              <option value="status">Status</option>
+            </select>
+            <button
+              onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+              className="text-xs font-bold text-[#146C43] px-1 hover:underline"
+            >
+              {sortDirection.toUpperCase()}
+            </button>
+          </div>
         </div>
 
         {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'VEHICLE_ADMIN') && (
@@ -180,7 +265,7 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
           <thead>
             <tr className="border-b border-[#E6E6E2] text-xs font-semibold text-[#6B7280] uppercase tracking-wider bg-[#F5F5F3]">
               <th className="py-3 px-4">Plate Number</th>
-              <th className="py-3 px-4">Assigned Location</th>
+              <th className="py-3 px-4">Assigned Site</th>
               <th className="py-3 px-4">Brand & Model</th>
               <th className="py-3 px-4">Vehicle Type</th>
               <th className="py-3 px-4">Ownership</th>
@@ -198,7 +283,7 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
             ) : vehicles.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-8 text-center text-[#6B7280]">
-                  No vehicles found in fleet registry.
+                  No vehicles matching search criteria.
                 </td>
               </tr>
             ) : (
@@ -222,7 +307,7 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
                     <Badge status={v.status} />
                   </td>
                   <td className="py-3 px-4 text-right space-x-2">
-                    {canManageVehicle(v) && (
+                    {canManageVehicle(v) ? (
                       <>
                         <button
                           onClick={() => handleOpenEditModal(v)}
@@ -239,6 +324,8 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </>
+                    ) : (
+                      <span className="text-xs text-[#9CA3AF] italic">View Only</span>
                     )}
                   </td>
                 </tr>
@@ -246,6 +333,37 @@ export const VehiclesPage: React.FC<VehiclesPageProps> = ({ currentUser }) => {
             )}
           </tbody>
         </table>
+
+        {/* Pagination Bar */}
+        {meta.total > 0 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[#ECECE8] bg-[#FAFAF8] text-xs text-[#6B7280]">
+            <div>
+              Showing <span className="font-bold text-[#18181B]">{meta.from}</span> to{' '}
+              <span className="font-bold text-[#18181B]">{meta.to}</span> of{' '}
+              <span className="font-bold text-[#18181B]">{meta.total}</span> vehicles
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+                className="p-1.5 rounded-lg border border-[#E6E6E2] bg-white text-[#18181B] disabled:opacity-40 disabled:cursor-not-allowed hover:border-[#146C43]"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="font-semibold text-[#18181B]">
+                Page {meta.current_page} of {meta.last_page}
+              </span>
+              <button
+                disabled={page >= meta.last_page}
+                onClick={() => setPage(page + 1)}
+                className="p-1.5 rounded-lg border border-[#E6E6E2] bg-white text-[#18181B] disabled:opacity-40 disabled:cursor-not-allowed hover:border-[#146C43]"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add / Edit Vehicle Modal */}

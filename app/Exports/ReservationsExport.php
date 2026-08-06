@@ -9,15 +9,39 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class ReservationsExport implements FromCollection, WithHeadings, WithMapping
 {
+    public function __construct(
+        protected ?string $startDate = null,
+        protected ?string $endDate = null,
+        protected array $locationIds = [],
+        protected ?string $userLocationId = null
+    ) {}
+
     public function collection()
     {
-        return Reservation::with(['user', 'vehicle', 'driver'])->get();
+        $query = Reservation::with(['user', 'vehicle', 'driver', 'location']);
+
+        if ($this->userLocationId) {
+            $query->where('location_id', $this->userLocationId);
+        } elseif (! empty($this->locationIds)) {
+            $query->whereIn('location_id', $this->locationIds);
+        }
+
+        if ($this->startDate) {
+            $query->whereDate('start_datetime', '>=', $this->startDate);
+        }
+
+        if ($this->endDate) {
+            $query->whereDate('end_datetime', '<=', $this->endDate);
+        }
+
+        return $query->latest()->get();
     }
 
     public function headings(): array
     {
         return [
             'Reservation Code',
+            'Location Site',
             'Creator (Admin)',
             'Vehicle Plate',
             'Vehicle Model',
@@ -35,6 +59,7 @@ class ReservationsExport implements FromCollection, WithHeadings, WithMapping
     {
         return [
             $reservation->reservation_code,
+            $reservation->location->name ?? 'N/A',
             $reservation->user->name ?? 'N/A',
             $reservation->vehicle->plate_number ?? 'N/A',
             $reservation->vehicle->model ?? 'N/A',

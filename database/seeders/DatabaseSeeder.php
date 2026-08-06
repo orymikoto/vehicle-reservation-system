@@ -16,6 +16,7 @@ use App\Models\Location;
 use App\Models\MaintenanceLog;
 use App\Models\Reservation;
 use App\Models\ReservationApproval;
+use App\Models\Setting;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleTransfer;
@@ -29,10 +30,11 @@ class DatabaseSeeder extends Seeder
     {
         activity()->disableLogging();
 
-        // 1. Operational Locations (1 HQ, 1 Branch, 6 Mine Sites)
+        // 0. Seed System Settings
+        Setting::setValue('fuel_price_per_liter', '15000', 'Current default fuel price per liter in IDR');
+
+        // 1. Operational Locations (6 Mine Sites only, per user directive)
         $locationsData = [
-            ['code' => 'LOC-HQ', 'name' => 'Headquarters', 'region' => 'Jakarta HQ', 'address' => 'Gedung Menara Mining Lt. 24, Jakarta', 'type' => LocationType::HEADQUARTERS->value],
-            ['code' => 'LOC-BO', 'name' => 'Branch Office', 'region' => 'East Kalimantan Branch', 'address' => 'Jl. Jendral Sudirman No. 88, Balikpapan', 'type' => LocationType::BRANCH->value],
             ['code' => 'LOC-MSA', 'name' => 'Mine Site A', 'region' => 'Kutai Timur Pit Alpha', 'address' => 'Sangatta Mining Complex Sector 1', 'type' => LocationType::MINE->value],
             ['code' => 'LOC-MSB', 'name' => 'Mine Site B', 'region' => 'Kutai Barat Pit Bravo', 'address' => 'Sendawar Heavy Duty Camp', 'type' => LocationType::MINE->value],
             ['code' => 'LOC-MSC', 'name' => 'Mine Site C', 'region' => 'Berau Washing Plant', 'address' => 'Tanjung Redeb Logistics Port', 'type' => LocationType::MINE->value],
@@ -108,7 +110,7 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // 3. Vehicles & Drivers per Location (12 vehicles & 10 drivers per location = 96 vehicles, 80 drivers)
+        // 3. Vehicles & Drivers per Location (12 vehicles & 10 drivers per location = 72 vehicles, 60 drivers)
         $allVehicles = collect();
         $allDrivers = collect();
 
@@ -120,32 +122,41 @@ class DatabaseSeeder extends Seeder
             $allDrivers = $allDrivers->concat($locDrivers);
         }
 
-        // 4. Fuel & Maintenance Logs
+        // 4. Historical Fuel & Maintenance Logs Spanning 36 Months (3 Years)
         foreach ($allVehicles as $v) {
             $d = $allDrivers->where('location_id', $v->location_id)->first() ?? $allDrivers->first();
 
-            FuelLog::create([
-                'vehicle_id' => $v->id,
-                'driver_id' => $d->id,
-                'fuel_date' => fake()->dateTimeBetween('-3 months', 'now')->format('Y-m-d'),
-                'fuel_amount' => round(fake()->randomFloat(1, 50, 300), 1),
-                'fuel_cost' => fake()->numberBetween(7500, 45000) * 100,
-                'odometer' => fake()->numberBetween(15000, 120000),
-                'notes' => 'Site fueling station refill',
-            ]);
+            // 6-8 refueling records across past 3 years per vehicle
+            for ($k = 0; $k < 6; $k++) {
+                $fuelAmount = round(fake()->randomFloat(1, 40, 250), 1);
+                $fuelCost = (int) ($fuelAmount * 15000);
 
-            MaintenanceLog::create([
-                'vehicle_id' => $v->id,
-                'service_date' => fake()->dateTimeBetween('-3 months', 'now')->format('Y-m-d'),
-                'service_type' => 'ROUTINE',
-                'workshop' => 'Authorized Site Service Bay',
-                'cost' => fake()->numberBetween(15000, 120000) * 100,
-                'next_service_date' => now()->addMonths(3)->format('Y-m-d'),
-                'notes' => 'Routine 10,000 KM heavy duty maintenance',
-            ]);
+                FuelLog::create([
+                    'vehicle_id' => $v->id,
+                    'driver_id' => $d->id,
+                    'fuel_date' => fake()->dateTimeBetween('-36 months', 'now')->format('Y-m-d'),
+                    'fuel_amount' => $fuelAmount,
+                    'fuel_cost' => $fuelCost,
+                    'odometer' => fake()->numberBetween(15000, 120000),
+                    'notes' => 'Site fueling station refill',
+                ]);
+            }
+
+            // 3-4 maintenance service records across past 3 years per vehicle
+            for ($m = 0; $m < 3; $m++) {
+                MaintenanceLog::create([
+                    'vehicle_id' => $v->id,
+                    'service_date' => fake()->dateTimeBetween('-36 months', 'now')->format('Y-m-d'),
+                    'service_type' => fake()->randomElement(['ROUTINE', 'REPAIR', 'EMERGENCY']),
+                    'workshop' => 'Authorized Site Service Bay',
+                    'cost' => fake()->numberBetween(15000, 120000) * 100,
+                    'next_service_date' => now()->addMonths(3)->format('Y-m-d'),
+                    'notes' => 'Routine 10,000 KM heavy duty maintenance',
+                ]);
+            }
         }
 
-        // 5. Reservations per Location (10 per location = 80 reservations)
+        // 5. Reservations per Location Spanning 3 Years
         foreach ($locations as $loc) {
             $locVehicles = $allVehicles->where('location_id', $loc->id)->values();
             $locDrivers = $allDrivers->where('location_id', $loc->id)->values();
@@ -155,10 +166,10 @@ class DatabaseSeeder extends Seeder
             $l1App = $locApprovers->first() ?? $approver1;
             $l2App = $locApprovers->skip(1)->first() ?? $approver2;
 
-            for ($r = 1; $r <= 10; $r++) {
+            for ($r = 1; $r <= 15; $r++) {
                 $v = $locVehicles->random();
                 $d = $locDrivers->random();
-                $startDate = fake()->dateTimeBetween('-2 months', '+2 weeks');
+                $startDate = fake()->dateTimeBetween('-36 months', '+2 weeks');
                 $endDate = (clone $startDate)->modify('+8 hours');
 
                 if ($r <= 3) {

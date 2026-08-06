@@ -35,8 +35,26 @@ class MaintenanceController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Maintenance log recorded successfully',
+            'message' => 'Maintenance log saved successfully',
             'data' => $log,
         ], 201);
+    }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        if (! ($user->isSuperAdmin() || $user->isVehicleAdmin())) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized to delete maintenance log records.',
+            ], 403);
+        }
+
+        $this->maintenanceService->deleteMaintenanceLog($id, $user);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Maintenance log deleted successfully',
+        ]);
     }
 }

@@ -9,7 +9,14 @@ use Illuminate\Database\Eloquent\Collection;
 
 interface DriverRepositoryInterface
 {
-    public function getAllPaginated(int $perPage = 15, ?string $search = null): LengthAwarePaginator;
+    public function getAllPaginated(
+        int $perPage = 15,
+        ?string $search = null,
+        ?string $status = null,
+        ?string $locationId = null,
+        string $sortBy = 'created_at',
+        string $sortDirection = 'desc'
+    ): LengthAwarePaginator;
 
     public function getAllAvailable(): Collection;
 

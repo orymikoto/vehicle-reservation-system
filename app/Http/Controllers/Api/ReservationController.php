@@ -23,7 +23,10 @@ class ReservationController extends Controller
         $reservations = $this->reservationService->getPaginatedReservations(
             $request->integer('per_page', 15),
             $request->query('search'),
-            $request->query('status')
+            $request->query('status'),
+            $request->query('location_id'),
+            $request->query('sort_by', 'created_at'),
+            $request->query('sort_direction', 'desc')
         );
 
         return response()->json([

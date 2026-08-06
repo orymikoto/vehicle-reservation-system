@@ -10,27 +10,43 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ReservationRepository implements ReservationRepositoryInterface
 {
-    public function getAllPaginated(int $perPage = 15, ?string $search = null, ?string $status = null, ?string $locationId = null): LengthAwarePaginator
-    {
+    public function getAllPaginated(
+        int $perPage = 15,
+        ?string $search = null,
+        ?string $status = null,
+        ?string $locationId = null,
+        string $sortBy = 'created_at',
+        string $sortDirection = 'desc'
+    ): LengthAwarePaginator {
         $query = Reservation::with(['user', 'vehicle', 'driver', 'location', 'approvals.approver']);
 
         if ($locationId) {
             $query->where('location_id', $locationId);
         }
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('reservation_code', 'like', "%{$search}%")
-                    ->orWhere('purpose', 'like', "%{$search}%")
-                    ->orWhere('destination', 'like', "%{$search}%");
-            });
-        }
-
         if ($status) {
             $query->where('status', $status);
         }
 
-        return $query->latest()->paginate($perPage);
+        if ($search) {
+            $searchTerm = '%'.strtolower($search).'%';
+            $query->where(function ($q) use ($searchTerm) {
+                $q->whereRaw('LOWER(reservation_code) LIKE ?', [$searchTerm])
+                    ->orWhereRaw('LOWER(purpose) LIKE ?', [$searchTerm])
+                    ->orWhereRaw('LOWER(destination) LIKE ?', [$searchTerm])
+                    ->orWhereHas('vehicle', function ($vq) use ($searchTerm) {
+                        $vq->whereRaw('LOWER(plate_number) LIKE ?', [$searchTerm])
+                            ->orWhereRaw('LOWER(brand) LIKE ?', [$searchTerm])
+                            ->orWhereRaw('LOWER(model) LIKE ?', [$searchTerm]);
+                    });
+            });
+        }
+
+        $allowedSorts = ['reservation_code', 'start_datetime', 'end_datetime', 'status', 'created_at'];
+        $sortColumn = in_array($sortBy, $allowedSorts) ? $sortBy : 'created_at';
+        $direction = strtolower($sortDirection) === 'asc' ? 'asc' : 'desc';
+
+        return $query->orderBy($sortColumn, $direction)->paginate($perPage);
     }
 
     public function findById(string $id): ?Reservation

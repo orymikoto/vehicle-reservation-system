@@ -29,6 +29,8 @@ class DashboardService
             default => now()->subMonths(3), // '3_months'
         };
 
+        $dateCutoffStr = $cutOffDate->format('Y-m-d');
+
         // 1. Top Cards Vehicle Metrics
         $vehicleQuery = Vehicle::query();
         if ($locationId) {
@@ -41,7 +43,7 @@ class DashboardService
         $maintenanceVehicles = (clone $vehicleQuery)->where('status', VehicleStatus::MAINTENANCE->value)->count();
         $inTransferVehicles = (clone $vehicleQuery)->where('status', VehicleStatus::IN_TRANSFER->value)->count();
 
-        // 2. Location Summary Cards Grid
+        // 2. Location Summary Cards Grid (Only Mine Sites)
         $locations = Location::where('is_active', true)->orderBy('name', 'asc')->get();
         $todayStr = now()->format('Y-m-d');
 
@@ -88,7 +90,7 @@ class DashboardService
             DB::raw("{$fuelDateExpr} as month"),
             DB::raw('SUM(fuel_amount) as liters'),
             DB::raw('SUM(fuel_cost) as cost')
-        )->where('fuel_date', '>=', $cutOffDate->format('Y-m-d'));
+        )->where('fuel_date', '>=', $dateCutoffStr);
 
         if ($locationId) {
             $fuelQuery->whereHas('vehicle', fn ($q) => $q->where('location_id', $locationId));
@@ -115,7 +117,7 @@ class DashboardService
         $maintQuery = MaintenanceLog::select(
             DB::raw("{$maintDateExpr} as month"),
             DB::raw('SUM(cost) as cost')
-        )->where('service_date', '>=', $cutOffDate->format('Y-m-d'));
+        )->where('service_date', '>=', $dateCutoffStr);
 
         if ($locationId) {
             $maintQuery->whereHas('vehicle', fn ($q) => $q->where('location_id', $locationId));
@@ -164,19 +166,19 @@ class DashboardService
             'maintenance_percentage' => $maintenancePercentage,
         ];
 
-        // 7. Sites with Most Fuel Money Spent (Ranking)
-        $siteFuelQuery = Location::where('is_active', true);
-        if ($locationId) {
-            $siteFuelQuery->where('id', $locationId);
-        }
-
-        $topFuelSites = $siteFuelQuery->get()->map(function ($loc) use ($cutOffDate) {
-            $totalFuel = FuelLog::whereHas('vehicle', fn ($q) => $q->where('location_id', $loc->id))
-                ->where('fuel_date', '>=', $cutOffDate->format('Y-m-d'))
+        // 7. Contextual Table Data
+        // Global View: Top Sites by Total Expenses (Combined Fuel + Maintenance)
+        $topExpenseSites = Location::where('is_active', true)->get()->map(function ($loc) use ($dateCutoffStr) {
+            $fuelCost = FuelLog::whereHas('vehicle', fn ($q) => $q->where('location_id', $loc->id))
+                ->where('fuel_date', '>=', $dateCutoffStr)
                 ->sum('fuel_cost');
 
-            $totalLiters = FuelLog::whereHas('vehicle', fn ($q) => $q->where('location_id', $loc->id))
-                ->where('fuel_date', '>=', $cutOffDate->format('Y-m-d'))
+            $maintCost = MaintenanceLog::whereHas('vehicle', fn ($q) => $q->where('location_id', $loc->id))
+                ->where('service_date', '>=', $dateCutoffStr)
+                ->sum('cost');
+
+            $fuelLiters = FuelLog::whereHas('vehicle', fn ($q) => $q->where('location_id', $loc->id))
+                ->where('fuel_date', '>=', $dateCutoffStr)
                 ->sum('fuel_amount');
 
             return [
@@ -184,10 +186,41 @@ class DashboardService
                 'code' => $loc->code,
                 'name' => $loc->name,
                 'region' => $loc->region,
-                'total_fuel_cost' => (float) $totalFuel,
-                'total_liters' => round((float) $totalLiters, 1),
+                'fuel_cost' => (float) $fuelCost,
+                'maintenance_cost' => (float) $maintCost,
+                'total_expense' => (float) ($fuelCost + $maintCost),
+                'total_liters' => round((float) $fuelLiters, 1),
             ];
-        })->sortByDesc('total_fuel_cost')->values()->toArray();
+        })->sortByDesc('total_expense')->values()->toArray();
+
+        // Site View (when locationId is selected): Top Vehicles at that site by Total Expenses
+        $topSiteVehicles = [];
+        if ($locationId) {
+            $topSiteVehicles = Vehicle::where('location_id', $locationId)->get()->map(function ($v) use ($dateCutoffStr) {
+                $fuelCost = FuelLog::where('vehicle_id', $v->id)
+                    ->where('fuel_date', '>=', $dateCutoffStr)
+                    ->sum('fuel_cost');
+
+                $maintCost = MaintenanceLog::where('vehicle_id', $v->id)
+                    ->where('service_date', '>=', $dateCutoffStr)
+                    ->sum('cost');
+
+                $fuelLiters = FuelLog::where('vehicle_id', $v->id)
+                    ->where('fuel_date', '>=', $dateCutoffStr)
+                    ->sum('fuel_amount');
+
+                return [
+                    'id' => $v->id,
+                    'plate_number' => $v->plate_number,
+                    'brand' => $v->brand,
+                    'model' => $v->model,
+                    'fuel_cost' => (float) $fuelCost,
+                    'maintenance_cost' => (float) $maintCost,
+                    'total_expense' => (float) ($fuelCost + $maintCost),
+                    'total_liters' => round((float) $fuelLiters, 1),
+                ];
+            })->sortByDesc('total_expense')->take(10)->values()->toArray();
+        }
 
         // 8. Vehicle Utilization by Type
         $utilQuery = Vehicle::select('type', DB::raw('COUNT(*) as count'));
@@ -214,7 +247,8 @@ class DashboardService
             'fuel_trend' => $fuelTrend,
             'maintenance_trend' => $maintenanceTrend,
             'expense_distribution' => $expenseDistribution,
-            'top_fuel_sites' => $topFuelSites,
+            'top_expense_sites' => $topExpenseSites,
+            'top_site_vehicles' => $topSiteVehicles,
             'vehicle_utilization' => $vehicleUtilization,
         ];
     }

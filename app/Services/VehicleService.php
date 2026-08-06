@@ -14,9 +14,22 @@ class VehicleService
         protected VehicleRepositoryInterface $vehicleRepository
     ) {}
 
-    public function getPaginatedVehicles(int $perPage = 15, ?string $search = null, ?string $status = null): LengthAwarePaginator
-    {
-        return $this->vehicleRepository->getAllPaginated($perPage, $search, $status);
+    public function getPaginatedVehicles(
+        int $perPage = 15,
+        ?string $search = null,
+        ?string $status = null,
+        ?string $locationId = null,
+        string $sortBy = 'created_at',
+        string $sortDirection = 'desc'
+    ): LengthAwarePaginator {
+        return $this->vehicleRepository->getAllPaginated(
+            $perPage,
+            $search,
+            $status,
+            $locationId,
+            $sortBy,
+            $sortDirection
+        );
     }
 
     public function getAvailableVehicles(): Collection

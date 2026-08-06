@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\MaintenanceController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReservationController;
+use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\VehicleTransferController;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::get('/auth/approvers', [AuthController::class, 'approvers']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+        // System Settings
+        Route::get('/settings', [SettingController::class, 'index']);
+        Route::put('/settings', [SettingController::class, 'update']);
 
         // Location Management
         Route::get('/locations', [LocationController::class, 'index']);
@@ -79,8 +84,10 @@ Route::prefix('v1')->group(function () {
         // Fuel & Maintenance Tracking
         Route::get('/fuel-logs', [FuelController::class, 'index']);
         Route::post('/fuel-logs', [FuelController::class, 'store']);
+        Route::delete('/fuel-logs/{id}', [FuelController::class, 'destroy']);
         Route::get('/maintenance-logs', [MaintenanceController::class, 'index']);
         Route::post('/maintenance-logs', [MaintenanceController::class, 'store']);
+        Route::delete('/maintenance-logs/{id}', [MaintenanceController::class, 'destroy']);
 
         // Exports & Reports
         Route::get('/reports/reservations/export', [ReportController::class, 'exportReservations']);

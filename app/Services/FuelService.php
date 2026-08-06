@@ -30,4 +30,16 @@ class FuelService
 
         return $log;
     }
+
+    public function deleteFuelLog(string $id, User $user): bool
+    {
+        $log = FuelLog::findOrFail($id);
+
+        activity()
+            ->causedBy($user)
+            ->performedOn($log)
+            ->log("Fuel log deleted for vehicle ID {$log->vehicle_id}: {$log->fuel_amount} L (Cost: {$log->fuel_cost}) on {$log->fuel_date}");
+
+        return $log->delete();
+    }
 }

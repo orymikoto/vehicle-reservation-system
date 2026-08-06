@@ -8,7 +8,14 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 interface ReservationRepositoryInterface
 {
-    public function getAllPaginated(int $perPage = 15, ?string $search = null, ?string $status = null): LengthAwarePaginator;
+    public function getAllPaginated(
+        int $perPage = 15,
+        ?string $search = null,
+        ?string $status = null,
+        ?string $locationId = null,
+        string $sortBy = 'created_at',
+        string $sortDirection = 'desc'
+    ): LengthAwarePaginator;
 
     public function findById(string $id): ?Reservation;
 

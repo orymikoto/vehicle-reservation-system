@@ -14,9 +14,22 @@ class DriverService
         protected DriverRepositoryInterface $driverRepository
     ) {}
 
-    public function getPaginatedDrivers(int $perPage = 15, ?string $search = null): LengthAwarePaginator
-    {
-        return $this->driverRepository->getAllPaginated($perPage, $search);
+    public function getPaginatedDrivers(
+        int $perPage = 15,
+        ?string $search = null,
+        ?string $status = null,
+        ?string $locationId = null,
+        string $sortBy = 'created_at',
+        string $sortDirection = 'desc'
+    ): LengthAwarePaginator {
+        return $this->driverRepository->getAllPaginated(
+            $perPage,
+            $search,
+            $status,
+            $locationId,
+            $sortBy,
+            $sortDirection
+        );
     }
 
     public function getAvailableDrivers(): Collection

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
-import { Reservation, Vehicle, Driver, User, Location } from '../types';
+import { Reservation, Vehicle, Driver, User, Location, PaginatedMeta } from '../types';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
-import { Plus, Search, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Plus, Search, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 
 interface ReservationsPageProps {
   currentUser: User;
@@ -11,13 +11,27 @@ interface ReservationsPageProps {
 
 export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser }) => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filter, Sort, Pagination states
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState<PaginatedMeta>({
+    current_page: 1,
+    last_page: 1,
+    per_page: 15,
+    total: 0,
+    from: 0,
+    to: 0,
+  });
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [locations, setLocations] = useState<Location[]>([]);
   const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([]);
   const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
   const [approvers, setApprovers] = useState<User[]>([]);
@@ -36,15 +50,40 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
+    if (currentUser.role === 'SUPER_ADMIN') {
+      api.get('/locations?active_only=true').then((res) => setLocations(res.data.data));
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
     fetchReservations();
-  }, [search, statusFilter]);
+  }, [search, statusFilter, locationFilter, sortBy, sortDirection, page]);
 
   const fetchReservations = async () => {
     try {
+      setLoading(true);
       const res = await api.get('/reservations', {
-        params: { search, status: statusFilter },
+        params: {
+          search,
+          status: statusFilter,
+          location_id: locationFilter,
+          sort_by: sortBy,
+          sort_direction: sortDirection,
+          page,
+          per_page: 15,
+        },
       });
-      setReservations(res.data.data.data || res.data.data);
+
+      const paginatedData = res.data.data;
+      setReservations(paginatedData.data || []);
+      setMeta({
+        current_page: paginatedData.current_page || 1,
+        last_page: paginatedData.last_page || 1,
+        per_page: paginatedData.per_page || 15,
+        total: paginatedData.total || 0,
+        from: paginatedData.from || 0,
+        to: paginatedData.to || 0,
+      });
     } catch (err) {
       console.error('Failed to load reservations', err);
     } finally {
@@ -120,16 +159,19 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
   return (
     <div className="space-y-6">
       {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Search Box */}
           <div className="relative w-64">
             <Search className="w-4 h-4 absolute left-3 top-3 text-[#6B7280]" />
             <input
               type="text"
-              placeholder="Search code, purpose..."
+              placeholder="Search code, vehicle plate, purpose..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               className="w-full pl-9 pr-3 h-10 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43]"
             />
           </div>
@@ -137,7 +179,10 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
           {/* Status Filter */}
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
             className="h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43]"
           >
             <option value="">All Statuses</option>
@@ -145,6 +190,46 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
             <option value="APPROVED">APPROVED</option>
             <option value="REJECTED">REJECTED</option>
           </select>
+
+          {/* Super Admin Only Site Filter */}
+          {currentUser.role === 'SUPER_ADMIN' && (
+            <select
+              value={locationFilter}
+              onChange={(e) => {
+                setLocationFilter(e.target.value);
+                setPage(1);
+              }}
+              className="h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43]"
+            >
+              <option value="">All Mine Sites</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name} ({loc.code})
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Sort By Dropdown */}
+          <div className="flex items-center gap-1 bg-white border border-[#E6E6E2] rounded-lg h-10 px-2">
+            <ArrowUpDown className="w-3.5 h-3.5 text-[#6B7280]" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="h-full bg-transparent text-sm focus:outline-none pr-1"
+            >
+              <option value="created_at">Date Created</option>
+              <option value="reservation_code">Reservation Code</option>
+              <option value="start_datetime">Start Time</option>
+              <option value="status">Status</option>
+            </select>
+            <button
+              onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+              className="text-xs font-bold text-[#146C43] px-1 hover:underline"
+            >
+              {sortDirection.toUpperCase()}
+            </button>
+          </div>
         </div>
 
         {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'VEHICLE_ADMIN') && (
@@ -231,6 +316,37 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
             )}
           </tbody>
         </table>
+
+        {/* Pagination Bar */}
+        {meta.total > 0 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[#ECECE8] bg-[#FAFAF8] text-xs text-[#6B7280]">
+            <div>
+              Showing <span className="font-bold text-[#18181B]">{meta.from}</span> to{' '}
+              <span className="font-bold text-[#18181B]">{meta.to}</span> of{' '}
+              <span className="font-bold text-[#18181B]">{meta.total}</span> reservations
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+                className="p-1.5 rounded-lg border border-[#E6E6E2] bg-white text-[#18181B] disabled:opacity-40 disabled:cursor-not-allowed hover:border-[#146C43]"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="font-semibold text-[#18181B]">
+                Page {meta.current_page} of {meta.last_page}
+              </span>
+              <button
+                disabled={page >= meta.last_page}
+                onClick={() => setPage(page + 1)}
+                className="p-1.5 rounded-lg border border-[#E6E6E2] bg-white text-[#18181B] disabled:opacity-40 disabled:cursor-not-allowed hover:border-[#146C43]"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Create Reservation Modal */}

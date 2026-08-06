@@ -30,4 +30,16 @@ class MaintenanceService
 
         return $log;
     }
+
+    public function deleteMaintenanceLog(string $id, User $user): bool
+    {
+        $log = MaintenanceLog::findOrFail($id);
+
+        activity()
+            ->causedBy($user)
+            ->performedOn($log)
+            ->log("Maintenance log deleted for vehicle ID {$log->vehicle_id}: {$log->service_type} (Cost: {$log->cost}) on {$log->service_date}");
+
+        return $log->delete();
+    }
 }

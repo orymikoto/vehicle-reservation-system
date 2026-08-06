@@ -25,9 +25,22 @@ class ReservationService
         protected DriverRepositoryInterface $driverRepository
     ) {}
 
-    public function getPaginatedReservations(int $perPage = 15, ?string $search = null, ?string $status = null, ?string $locationId = null): LengthAwarePaginator
-    {
-        return $this->reservationRepository->getAllPaginated($perPage, $search, $status, $locationId);
+    public function getPaginatedReservations(
+        int $perPage = 15,
+        ?string $search = null,
+        ?string $status = null,
+        ?string $locationId = null,
+        string $sortBy = 'created_at',
+        string $sortDirection = 'desc'
+    ): LengthAwarePaginator {
+        return $this->reservationRepository->getAllPaginated(
+            $perPage,
+            $search,
+            $status,
+            $locationId,
+            $sortBy,
+            $sortDirection
+        );
     }
 
     public function createReservation(CreateReservationDTO $dto, User $creator): Reservation

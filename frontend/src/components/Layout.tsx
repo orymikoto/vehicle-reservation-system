@@ -17,6 +17,7 @@ import {
   ArrowLeftRight,
   MapPin,
   Building2,
+  Settings,
 } from 'lucide-react';
 import { User, Location } from '../types';
 import api from '../services/api';
@@ -51,23 +52,49 @@ export const Layout: React.FC<LayoutProps> = ({
     }
   }, [user]);
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'reservations', label: 'Reservations', icon: CalendarCheck },
-    { id: 'approvals', label: 'Approvals', icon: CheckSquare },
-    { id: 'vehicles', label: 'Fleet Vehicles', icon: Truck },
-    { id: 'drivers', label: 'Drivers', icon: Users },
-    { id: 'vehicle-transfers', label: 'Vehicle Transfers', icon: ArrowLeftRight },
-    { id: 'driver-transfers', label: 'Driver Transfers', icon: ArrowLeftRight },
-    { id: 'fuel', label: 'Fuel Logs', icon: Fuel },
-    { id: 'maintenance', label: 'Maintenance', icon: Wrench },
-    { id: 'reports', label: 'Reports & Export', icon: FileSpreadsheet },
-  ];
+  // Construct Role-Aware Navigation Items per User Directives
+  let navItems: { id: string; label: string; icon: any }[] = [];
 
-  if (user.role === 'SUPER_ADMIN') {
-    navItems.push({ id: 'locations', label: 'Location Management', icon: Building2 });
-    navItems.push({ id: 'audit-logs', label: 'Audit Logs', icon: History });
+  if (user.role === 'APPROVER') {
+    navItems = [
+      { id: 'approvals', label: 'Approvals', icon: CheckSquare },
+      { id: 'vehicles', label: 'Fleet Vehicles (View Only)', icon: Truck },
+      { id: 'drivers', label: 'Drivers (View Only)', icon: Users },
+    ];
+  } else if (user.role === 'VEHICLE_ADMIN') {
+    navItems = [
+      { id: 'vehicles', label: 'Fleet Vehicles', icon: Truck },
+      { id: 'drivers', label: 'Drivers', icon: Users },
+      { id: 'reservations', label: 'Reservations', icon: CalendarCheck },
+      { id: 'fuel', label: 'Fuel Logs', icon: Fuel },
+      { id: 'maintenance', label: 'Maintenance', icon: Wrench },
+      { id: 'reports', label: 'Reports & Export', icon: FileSpreadsheet },
+    ];
+  } else {
+    // SUPER_ADMIN (All Menus)
+    navItems = [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'reservations', label: 'Reservations', icon: CalendarCheck },
+      { id: 'approvals', label: 'Approvals', icon: CheckSquare },
+      { id: 'vehicles', label: 'Fleet Vehicles', icon: Truck },
+      { id: 'drivers', label: 'Drivers', icon: Users },
+      { id: 'vehicle-transfers', label: 'Vehicle Transfers', icon: ArrowLeftRight },
+      { id: 'driver-transfers', label: 'Driver Transfers', icon: ArrowLeftRight },
+      { id: 'fuel', label: 'Fuel Logs', icon: Fuel },
+      { id: 'maintenance', label: 'Maintenance', icon: Wrench },
+      { id: 'reports', label: 'Reports & Export', icon: FileSpreadsheet },
+      { id: 'locations', label: 'Location Management', icon: Building2 },
+      { id: 'settings', label: 'System Settings', icon: Settings },
+      { id: 'audit-logs', label: 'Audit Logs', icon: History },
+    ];
   }
+
+  // Ensure activeTab is valid for the current role
+  useEffect(() => {
+    if (navItems.length > 0 && !navItems.some((item) => item.id === activeTab)) {
+      setActiveTab(navItems[0].id);
+    }
+  }, [user.role]);
 
   const handleNavClick = (tabId: string) => {
     setActiveTab(tabId);
@@ -192,7 +219,7 @@ export const Layout: React.FC<LayoutProps> = ({
                   onChange={(e) => onLocationChange && onLocationChange(e.target.value)}
                   className="text-xs font-medium bg-[#FAFAF8] text-[#18181B] border border-[#E6E6E2] rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#146C43]"
                 >
-                  <option value="">All Locations (Global)</option>
+                  <option value="">All Mine Sites (Global View)</option>
                   {locations.map((loc) => (
                     <option key={loc.id} value={loc.id}>
                       {loc.name} ({loc.code})

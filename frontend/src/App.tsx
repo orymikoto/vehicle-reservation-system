@@ -10,6 +10,7 @@ import { DriversPage } from './pages/DriversPage';
 import { VehicleTransfersPage } from './pages/VehicleTransfersPage';
 import { DriverTransfersPage } from './pages/DriverTransfersPage';
 import { LocationsPage } from './pages/LocationsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { FuelPage } from './pages/FuelPage';
 import { MaintenancePage } from './pages/MaintenancePage';
 import { ReportsPage } from './pages/ReportsPage';
@@ -105,12 +106,14 @@ export function App() {
         );
       case 'locations':
         return <LocationsPage />;
+      case 'settings':
+        return <SettingsPage currentUser={user} />;
       case 'fuel':
         return <FuelPage currentUser={user} />;
       case 'maintenance':
         return <MaintenancePage currentUser={user} />;
       case 'reports':
-        return <ReportsPage />;
+        return <ReportsPage currentUser={user} />;
       case 'audit-logs':
         return <AuditLogPage />;
       default:

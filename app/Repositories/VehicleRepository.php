@@ -8,26 +8,50 @@ use App\Enums\VehicleStatus;
 use App\Models\Vehicle;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class VehicleRepository implements VehicleRepositoryInterface
 {
-    public function getAllPaginated(int $perPage = 15, ?string $search = null, ?string $status = null): LengthAwarePaginator
-    {
-        $query = Vehicle::query();
+    public function getAllPaginated(
+        int $perPage = 15,
+        ?string $search = null,
+        ?string $status = null,
+        ?string $locationId = null,
+        string $sortBy = 'created_at',
+        string $sortDirection = 'desc'
+    ): LengthAwarePaginator {
+        $query = Vehicle::with('location');
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('plate_number', 'like', "%{$search}%")
-                    ->orWhere('brand', 'like', "%{$search}%")
-                    ->orWhere('model', 'like', "%{$search}%");
-            });
+        if ($locationId) {
+            $query->where('location_id', $locationId);
         }
 
         if ($status) {
             $query->where('status', $status);
         }
 
-        return $query->latest()->paginate($perPage);
+        if ($search) {
+            $searchTerm = '%'.strtolower($search).'%';
+            $isPgsql = DB::getDriverName() === 'pgsql';
+
+            $query->where(function ($q) use ($search, $searchTerm, $isPgsql) {
+                if ($isPgsql) {
+                    $q->where('plate_number', 'ILIKE', "%{$search}%")
+                        ->orWhere('brand', 'ILIKE', "%{$search}%")
+                        ->orWhere('model', 'ILIKE', "%{$search}%");
+                } else {
+                    $q->whereRaw('LOWER(plate_number) LIKE ?', [$searchTerm])
+                        ->orWhereRaw('LOWER(brand) LIKE ?', [$searchTerm])
+                        ->orWhereRaw('LOWER(model) LIKE ?', [$searchTerm]);
+                }
+            });
+        }
+
+        $allowedSorts = ['plate_number', 'brand', 'model', 'type', 'ownership', 'status', 'created_at'];
+        $sortColumn = in_array($sortBy, $allowedSorts) ? $sortBy : 'created_at';
+        $direction = strtolower($sortDirection) === 'asc' ? 'asc' : 'desc';
+
+        return $query->orderBy($sortColumn, $direction)->paginate($perPage);
     }
 
     public function getAllAvailable(): Collection
@@ -37,7 +61,7 @@ class VehicleRepository implements VehicleRepositoryInterface
 
     public function findById(string $id): ?Vehicle
     {
-        return Vehicle::find($id);
+        return Vehicle::with('location')->find($id);
     }
 
     public function create(CreateVehicleDTO $dto): Vehicle

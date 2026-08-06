@@ -39,4 +39,22 @@ class FuelController extends Controller
             'data' => $log,
         ], 201);
     }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        if (! ($user->isSuperAdmin() || $user->isVehicleAdmin())) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized to delete fuel log records.',
+            ], 403);
+        }
+
+        $this->fuelService->deleteFuelLog($id, $user);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Fuel log deleted successfully',
+        ]);
+    }
 }

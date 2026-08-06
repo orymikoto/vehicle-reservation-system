@@ -190,12 +190,25 @@ export interface ExpenseDistribution {
   maintenance_percentage: number;
 }
 
-export interface TopFuelSite {
+export interface TopExpenseSite {
   id: string;
   code: string;
   name: string;
   region: string;
-  total_fuel_cost: number;
+  fuel_cost: number;
+  maintenance_cost: number;
+  total_expense: number;
+  total_liters: number;
+}
+
+export interface TopSiteVehicle {
+  id: string;
+  plate_number: string;
+  brand: string;
+  model: string;
+  fuel_cost: number;
+  maintenance_cost: number;
+  total_expense: number;
   total_liters: number;
 }
 
@@ -210,6 +223,24 @@ export interface DashboardMetrics {
   fuel_trend: { month: string; liters: number; cost: number }[];
   maintenance_trend: { month: string; cost: number }[];
   expense_distribution: ExpenseDistribution;
-  top_fuel_sites: TopFuelSite[];
+  top_expense_sites: TopExpenseSite[];
+  top_site_vehicles: TopSiteVehicle[];
   vehicle_utilization: { type: string; count: number }[];
+}
+
+export interface PaginatedMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  from: number;
+  to: number;
+}
+
+export interface PaginatedData<T> {
+  data: T[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
 }

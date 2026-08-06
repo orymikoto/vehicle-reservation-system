@@ -15,6 +15,19 @@ class ReportController extends Controller
 
     public function exportReservations(Request $request): BinaryFileResponse
     {
-        return $this->reportService->exportReservations($request->user());
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+        $locationIds = $request->query('location_ids', []);
+
+        if (is_string($locationIds)) {
+            $locationIds = array_filter(explode(',', $locationIds));
+        }
+
+        return $this->reportService->exportReservations(
+            $request->user(),
+            $startDate,
+            $endDate,
+            $locationIds
+        );
     }
 }
