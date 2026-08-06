@@ -521,7 +521,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
                 <div className="overflow-x-auto">
                     {selectedLocationId ? (
-                        <table className="w-full text-left border-collapse">
+                        <table className="w-full min-w-[750px] text-left border-collapse whitespace-nowrap">
                             <thead>
                                 <tr className="border-b border-[#E6E6E2] text-xs font-semibold text-[#6B7280] uppercase tracking-wider bg-[#F5F5F3]">
                                     <th className="py-3 px-4">Rank</th>
@@ -587,7 +587,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                             </tbody>
                         </table>
                     ) : (
-                        <table className="w-full text-left border-collapse">
+                        <table className="w-full min-w-[750px] text-left border-collapse whitespace-nowrap">
                             <thead>
                                 <tr className="border-b border-[#E6E6E2] text-xs font-semibold text-[#6B7280] uppercase tracking-wider bg-[#F5F5F3]">
                                     <th className="py-3 px-4">Rank</th>

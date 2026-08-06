@@ -13,8 +13,8 @@ import { LocationsPage } from './pages/LocationsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { FuelPage } from './pages/FuelPage';
 import { MaintenancePage } from './pages/MaintenancePage';
-import { ReportsPage } from './pages/ReportsPage';
 import { AuditLogPage } from './pages/AuditLogPage';
+import { ReadmeDocPage } from './pages/ReadmeDocPage';
 import api from './services/api';
 
 export function App() {
@@ -36,6 +36,9 @@ export function App() {
     try {
       const res = await api.get('/auth/me');
       setUser(res.data.data);
+      if (window.location.pathname.includes('/login')) {
+        window.history.pushState({}, '', '/');
+      }
     } catch (err) {
       console.error('Session expired', err);
       handleLogout();
@@ -48,6 +51,9 @@ export function App() {
     localStorage.setItem('minefleet_token', authToken);
     setToken(authToken);
     setUser(userData);
+    if (window.location.pathname.includes('/login')) {
+      window.history.pushState({}, '', '/');
+    }
   };
 
   const handleLogout = async () => {
@@ -59,6 +65,7 @@ export function App() {
     localStorage.removeItem('minefleet_token');
     setToken(null);
     setUser(null);
+    window.history.pushState({}, '', '/login');
   };
 
   if (loading) {
@@ -112,10 +119,10 @@ export function App() {
         return <FuelPage currentUser={user} />;
       case 'maintenance':
         return <MaintenancePage currentUser={user} />;
-      case 'reports':
-        return <ReportsPage currentUser={user} />;
       case 'audit-logs':
         return <AuditLogPage />;
+      case 'readme':
+        return <ReadmeDocPage />;
       default:
         return (
           <DashboardPage

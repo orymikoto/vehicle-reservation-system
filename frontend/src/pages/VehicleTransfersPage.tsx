@@ -148,7 +148,7 @@ export const VehicleTransfersPage: React.FC<VehicleTransfersPageProps> = ({
       ) : (
         <div className="bg-white border border-[#E6E6E2] rounded-xl overflow-hidden shadow-2xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-[#18181B]">
+            <table className="w-full text-left text-sm text-[#18181B] min-w-[800px] whitespace-nowrap">
               <thead className="bg-[#F5F5F3] text-xs font-semibold text-[#6B7280] uppercase tracking-wider border-b border-[#E6E6E2]">
                 <tr>
                   <th className="px-6 py-3.5">VEHICLE</th>

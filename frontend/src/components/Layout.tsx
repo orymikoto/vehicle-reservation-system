@@ -17,6 +17,7 @@ import {
   MapPin,
   Building2,
   Settings,
+  BookOpen,
 } from 'lucide-react';
 import { User, Location } from '../types';
 import api from '../services/api';
@@ -52,13 +53,14 @@ export const Layout: React.FC<LayoutProps> = ({
   }, [user]);
 
   // Construct Role-Aware Navigation Items per User Directives
-  let navItems: { id: string; label: string; icon: any }[] = [];
+  let navItems: { id: string; label: string; icon: any; isImportant?: boolean }[] = [];
 
   if (user.role === 'APPROVER') {
     navItems = [
       { id: 'approvals', label: 'Approvals', icon: CheckSquare },
       { id: 'vehicles', label: 'Fleet Vehicles (View Only)', icon: Truck },
       { id: 'drivers', label: 'Drivers (View Only)', icon: Users },
+      { id: 'readme', label: 'README', icon: BookOpen, isImportant: true },
     ];
   } else if (user.role === 'VEHICLE_ADMIN') {
     navItems = [
@@ -67,6 +69,7 @@ export const Layout: React.FC<LayoutProps> = ({
       { id: 'reservations', label: 'Reservations', icon: CalendarCheck },
       { id: 'fuel', label: 'Fuel Logs', icon: Fuel },
       { id: 'maintenance', label: 'Maintenance', icon: Wrench },
+      { id: 'readme', label: 'README', icon: BookOpen, isImportant: true },
     ];
   } else {
     // SUPER_ADMIN (All Menus)
@@ -83,6 +86,7 @@ export const Layout: React.FC<LayoutProps> = ({
       { id: 'locations', label: 'Location Management', icon: Building2 },
       { id: 'settings', label: 'System Settings', icon: Settings },
       { id: 'audit-logs', label: 'Audit Logs', icon: History },
+      { id: 'readme', label: 'README', icon: BookOpen, isImportant: true },
     ];
   }
 
@@ -139,6 +143,31 @@ export const Layout: React.FC<LayoutProps> = ({
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
+              
+              if (item.isImportant) {
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleNavClick(item.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold transition-all mt-3 border ${
+                      isActive
+                        ? 'bg-[#146C43] text-white border-[#146C43] shadow-xs'
+                        : 'bg-emerald-50 text-[#146C43] border-emerald-300 hover:bg-emerald-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-[#146C43]'}`} />
+                      <span>{item.label}</span>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-extrabold uppercase ${
+                      isActive ? 'bg-emerald-900 text-white' : 'bg-emerald-200 text-[#146C43]'
+                    }`}>
+                      DOCS
+                    </span>
+                  </button>
+                );
+              }
+
               return (
                 <button
                   key={item.id}

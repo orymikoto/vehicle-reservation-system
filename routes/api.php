@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\ApprovalController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DocController;
 use App\Http\Controllers\Api\DriverController;
 use App\Http\Controllers\Api\DriverTransferController;
 use App\Http\Controllers\Api\FuelController;
@@ -25,6 +26,10 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     // Auth Routes
     Route::post('/auth/login', [AuthController::class, 'login']);
+
+    // Public / Shared Documentation Endpoints
+    Route::get('/docs/readme', [DocController::class, 'getReadme']);
+    Route::get('/docs/note', [DocController::class, 'getNote']);
 
     // Authenticated Routes
     Route::middleware('auth:sanctum')->group(function () {

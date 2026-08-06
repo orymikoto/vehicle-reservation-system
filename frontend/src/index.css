@@ -99,5 +99,17 @@
   background-color: #FFFFFF;
   border: 1px solid #E6E6E2;
   border-radius: 10px;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive {
+  width: 100%;
+  min-width: 800px;
+  border-collapse: collapse;
+}
+
+.table-responsive th,
+.table-responsive td {
+  white-space: nowrap;
 }

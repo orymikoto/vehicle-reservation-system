@@ -206,10 +206,10 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
   return (
     <div className="space-y-6">
       {/* Header Actions */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
           {/* Search Box */}
-          <div className="relative w-64">
+          <div className="relative w-full sm:w-64">
             <Search className="w-4 h-4 absolute left-3 top-3 text-[#6B7280]" />
             <input
               type="text"
@@ -223,68 +223,72 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
             />
           </div>
 
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-            className="h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43]"
-          >
-            <option value="">All Statuses</option>
-            <option value="PENDING">PENDING</option>
-            <option value="APPROVED">APPROVED</option>
-            <option value="REJECTED">REJECTED</option>
-          </select>
-
-          {/* Super Admin Only Site Filter */}
-          {currentUser.role === 'SUPER_ADMIN' && (
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2.5 w-full sm:w-auto">
+            {/* Status Filter */}
             <select
-              value={locationFilter}
+              value={statusFilter}
               onChange={(e) => {
-                setLocationFilter(e.target.value);
+                setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43]"
+              className="h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43] w-full"
             >
-              <option value="">All Mine Sites</option>
-              {locations.map((loc) => (
-                <option key={loc.id} value={loc.id}>
-                  {loc.name} ({loc.code})
-                </option>
-              ))}
+              <option value="">All Statuses</option>
+              <option value="PENDING">PENDING</option>
+              <option value="APPROVED">APPROVED</option>
+              <option value="REJECTED">REJECTED</option>
             </select>
-          )}
 
-          {/* Sort By Dropdown */}
-          <div className="flex items-center gap-1 bg-white border border-[#E6E6E2] rounded-lg h-10 px-2">
-            <ArrowUpDown className="w-3.5 h-3.5 text-[#6B7280]" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="h-full bg-transparent text-sm focus:outline-none pr-1"
-            >
-              <option value="created_at">Date Created</option>
-              <option value="reservation_code">Reservation Code</option>
-              <option value="start_datetime">Start Time</option>
-              <option value="status">Status</option>
-            </select>
-            <button
-              onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-              className="text-xs font-bold text-[#146C43] px-1 hover:underline"
-            >
-              {sortDirection.toUpperCase()}
-            </button>
+            {/* Super Admin Only Site Filter */}
+            {currentUser.role === 'SUPER_ADMIN' && (
+              <select
+                value={locationFilter}
+                onChange={(e) => {
+                  setLocationFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43] w-full"
+              >
+                <option value="">All Mine Sites</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name} ({loc.code})
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Sort By Dropdown */}
+            <div className="flex items-center justify-between gap-1 bg-white border border-[#E6E6E2] rounded-lg h-10 px-2 col-span-2 sm:col-span-1">
+              <div className="flex items-center gap-1 min-w-0">
+                <ArrowUpDown className="w-3.5 h-3.5 text-[#6B7280] shrink-0" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="h-full bg-transparent text-sm focus:outline-none pr-1 truncate"
+                >
+                  <option value="created_at">Date Created</option>
+                  <option value="reservation_code">Reservation Code</option>
+                  <option value="start_datetime">Start Time</option>
+                  <option value="status">Status</option>
+                </select>
+              </div>
+              <button
+                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                className="text-xs font-bold text-[#146C43] px-1 hover:underline shrink-0"
+              >
+                {sortDirection.toUpperCase()}
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
           {/* Export Button */}
           <button
             onClick={handleExportReservations}
             disabled={downloading}
-            className="btn-secondary"
+            className="btn-secondary flex-1 sm:flex-none justify-center"
             title="Export filtered reservation records to Excel (.xlsx)"
           >
             <Download className="w-4 h-4 text-[#146C43]" />
@@ -292,7 +296,7 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
           </button>
 
           {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'VEHICLE_ADMIN') && (
-            <button onClick={handleOpenCreateModal} className="btn-primary">
+            <button onClick={handleOpenCreateModal} className="btn-primary flex-1 sm:flex-none justify-center">
               <Plus className="w-4 h-4" />
               New Reservation Request
             </button>
@@ -302,7 +306,7 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
 
       {/* Data Table */}
       <div className="table-container">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full text-left border-collapse min-w-[850px] whitespace-nowrap">
           <thead>
             <tr className="border-b border-[#E6E6E2] text-xs font-semibold text-[#6B7280] uppercase tracking-wider bg-[#F5F5F3]">
               <th className="py-3 px-4">Code</th>

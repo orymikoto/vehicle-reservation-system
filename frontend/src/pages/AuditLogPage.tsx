@@ -38,7 +38,7 @@ export const AuditLogPage: React.FC = () => {
       </div>
 
       <div className="table-container">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full text-left border-collapse min-w-[700px] whitespace-nowrap">
           <thead>
             <tr className="border-b border-[#E6E6E2] text-xs font-semibold text-[#6B7280] uppercase tracking-wider bg-[#F5F5F3]">
               <th className="py-3 px-4">Timestamp</th>

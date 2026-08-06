@@ -166,11 +166,11 @@ export const DriversPage: React.FC<DriversPageProps> = ({ currentUser }) => {
 
   return (
     <div className="space-y-6">
-      {/* Search, Filter, Sort Header Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
+      {/* Header Controls */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
           {/* Search Input */}
-          <div className="relative w-64">
+          <div className="relative w-full sm:w-64">
             <Search className="w-4 h-4 absolute left-3 top-3 text-[#6B7280]" />
             <input
               type="text"
@@ -184,74 +184,78 @@ export const DriversPage: React.FC<DriversPageProps> = ({ currentUser }) => {
             />
           </div>
 
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-            className="h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43]"
-          >
-            <option value="">All Statuses</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="ASSIGNED">ASSIGNED</option>
-            <option value="ON_LEAVE">ON_LEAVE</option>
-            <option value="TRANSFERRED">TRANSFERRED</option>
-          </select>
-
-          {/* Site Location Filter - Super Admin Only */}
-          {currentUser.role === 'SUPER_ADMIN' && (
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2.5 w-full sm:w-auto">
+            {/* Status Filter */}
             <select
-              value={locationFilter}
+              value={statusFilter}
               onChange={(e) => {
-                setLocationFilter(e.target.value);
+                setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43]"
+              className="h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43] w-full"
             >
-              <option value="">All Mine Sites</option>
-              {locations.map((loc) => (
-                <option key={loc.id} value={loc.id}>
-                  {loc.name} ({loc.code})
-                </option>
-              ))}
+              <option value="">All Statuses</option>
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="ASSIGNED">ASSIGNED</option>
+              <option value="ON_LEAVE">ON_LEAVE</option>
+              <option value="TRANSFERRED">TRANSFERRED</option>
             </select>
-          )}
 
-          {/* Sort By Dropdown */}
-          <div className="flex items-center gap-1 bg-white border border-[#E6E6E2] rounded-lg h-10 px-2">
-            <ArrowUpDown className="w-3.5 h-3.5 text-[#6B7280]" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="h-full bg-transparent text-sm focus:outline-none pr-1"
-            >
-              <option value="created_at">Date Registered</option>
-              <option value="name">Driver Name</option>
-              <option value="license_number">License Number</option>
-              <option value="status">Status</option>
-            </select>
-            <button
-              onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-              className="text-xs font-bold text-[#146C43] px-1 hover:underline"
-            >
-              {sortDirection.toUpperCase()}
-            </button>
+            {/* Site Location Filter - Super Admin Only */}
+            {currentUser.role === 'SUPER_ADMIN' && (
+              <select
+                value={locationFilter}
+                onChange={(e) => {
+                  setLocationFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="h-10 px-3 rounded-lg border border-[#E6E6E2] text-sm bg-white focus:outline-none focus:border-[#146C43] w-full"
+              >
+                <option value="">All Mine Sites</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name} ({loc.code})
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Sort By Dropdown */}
+            <div className="flex items-center justify-between gap-1 bg-white border border-[#E6E6E2] rounded-lg h-10 px-2 col-span-2 sm:col-span-1">
+              <div className="flex items-center gap-1 min-w-0">
+                <ArrowUpDown className="w-3.5 h-3.5 text-[#6B7280] shrink-0" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="h-full bg-transparent text-sm focus:outline-none pr-1 truncate"
+                >
+                  <option value="created_at">Date Added</option>
+                  <option value="name">Driver Name</option>
+                  <option value="license_number">License No</option>
+                  <option value="status">Status</option>
+                </select>
+              </div>
+              <button
+                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                className="text-xs font-bold text-[#146C43] px-1 hover:underline shrink-0"
+              >
+                {sortDirection.toUpperCase()}
+              </button>
+            </div>
           </div>
         </div>
 
         {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'VEHICLE_ADMIN') && (
-          <button onClick={handleOpenAddModal} className="btn-primary">
+          <button onClick={handleOpenAddModal} className="btn-primary w-full sm:w-auto justify-center">
             <Plus className="w-4 h-4" />
-            Register New Driver
+            Add Driver
           </button>
         )}
       </div>
 
-      {/* Data Table */}
+      {/* Table Container */}
       <div className="table-container">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full text-left border-collapse min-w-[850px] whitespace-nowrap">
           <thead>
             <tr className="border-b border-[#E6E6E2] text-xs font-semibold text-[#6B7280] uppercase tracking-wider bg-[#F5F5F3]">
               <th className="py-3 px-4">Driver Name</th>
