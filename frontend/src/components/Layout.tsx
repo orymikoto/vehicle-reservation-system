@@ -7,7 +7,6 @@ import {
   Users,
   Fuel,
   Wrench,
-  FileSpreadsheet,
   History,
   LogOut,
   ShieldCheck,
@@ -68,7 +67,6 @@ export const Layout: React.FC<LayoutProps> = ({
       { id: 'reservations', label: 'Reservations', icon: CalendarCheck },
       { id: 'fuel', label: 'Fuel Logs', icon: Fuel },
       { id: 'maintenance', label: 'Maintenance', icon: Wrench },
-      { id: 'reports', label: 'Reports & Export', icon: FileSpreadsheet },
     ];
   } else {
     // SUPER_ADMIN (All Menus)
@@ -82,7 +80,6 @@ export const Layout: React.FC<LayoutProps> = ({
       { id: 'driver-transfers', label: 'Driver Transfers', icon: ArrowLeftRight },
       { id: 'fuel', label: 'Fuel Logs', icon: Fuel },
       { id: 'maintenance', label: 'Maintenance', icon: Wrench },
-      { id: 'reports', label: 'Reports & Export', icon: FileSpreadsheet },
       { id: 'locations', label: 'Location Management', icon: Building2 },
       { id: 'settings', label: 'System Settings', icon: Settings },
       { id: 'audit-logs', label: 'Audit Logs', icon: History },

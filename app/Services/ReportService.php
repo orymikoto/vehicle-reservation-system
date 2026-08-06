@@ -13,7 +13,9 @@ class ReportService
         User $user,
         ?string $startDate = null,
         ?string $endDate = null,
-        array $locationIds = []
+        array $locationIds = [],
+        ?string $search = null,
+        ?string $status = null
     ): BinaryFileResponse {
         activity()
             ->causedBy($user)
@@ -22,7 +24,7 @@ class ReportService
         $userLocationId = $user->isSuperAdmin() ? null : $user->location_id;
 
         return Excel::download(
-            new ReservationsExport($startDate, $endDate, $locationIds, $userLocationId),
+            new ReservationsExport($startDate, $endDate, $locationIds, $userLocationId, $search, $status),
             'reservations-report-'.date('Y-m-d').'.xlsx'
         );
     }

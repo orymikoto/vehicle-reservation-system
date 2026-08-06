@@ -3,7 +3,7 @@ import api from '../services/api';
 import { Reservation, Vehicle, Driver, User, Location, PaginatedMeta } from '../types';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
-import { Plus, Search, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown, Download } from 'lucide-react';
 
 interface ReservationsPageProps {
   currentUser: User;
@@ -13,6 +13,7 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
 
   // Filter, Sort, Pagination states
   const [search, setSearch] = useState('');
@@ -91,6 +92,46 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
     }
   };
 
+  const handleExportReservations = async () => {
+    setDownloading(true);
+    try {
+      const response = await api.get('/reports/reservations/export', {
+        params: {
+          search,
+          status: statusFilter,
+          location_ids: locationFilter || undefined,
+        },
+        responseType: 'blob',
+      });
+
+      let siteSlug = 'global';
+      if (locationFilter) {
+        const foundLoc = locations.find((l) => l.id === locationFilter);
+        if (foundLoc) {
+          siteSlug = foundLoc.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        }
+      } else if (currentUser.role !== 'SUPER_ADMIN' && currentUser.location) {
+        siteSlug = currentUser.location.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      }
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      const fileName = `rsv-data-${siteSlug}-${todayStr}.xlsx`;
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error('Failed to export reservations Excel file', err);
+      alert('Failed to generate export file.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const handleOpenCreateModal = async () => {
     setFormError('');
     setIsModalOpen(true);
@@ -150,7 +191,13 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
       setDestination('');
       fetchReservations();
     } catch (err: any) {
-      setFormError(err.response?.data?.message || 'Failed to submit reservation.');
+      const respData = err.response?.data;
+      if (respData?.errors) {
+        const firstErrKey = Object.keys(respData.errors)[0];
+        setFormError(respData.errors[firstErrKey][0]);
+      } else {
+        setFormError(respData?.message || 'Failed to submit reservation.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -232,12 +279,25 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
           </div>
         </div>
 
-        {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'VEHICLE_ADMIN') && (
-          <button onClick={handleOpenCreateModal} className="btn-primary">
-            <Plus className="w-4 h-4" />
-            New Reservation Request
+        <div className="flex items-center gap-3">
+          {/* Export Button */}
+          <button
+            onClick={handleExportReservations}
+            disabled={downloading}
+            className="btn-secondary"
+            title="Export filtered reservation records to Excel (.xlsx)"
+          >
+            <Download className="w-4 h-4 text-[#146C43]" />
+            {downloading ? 'Exporting...' : 'Export to Excel'}
           </button>
-        )}
+
+          {(currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'VEHICLE_ADMIN') && (
+            <button onClick={handleOpenCreateModal} className="btn-primary">
+              <Plus className="w-4 h-4" />
+              New Reservation Request
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Data Table */}
@@ -358,8 +418,8 @@ export const ReservationsPage: React.FC<ReservationsPageProps> = ({ currentUser 
       >
         <form onSubmit={handleCreateReservation} className="space-y-4">
           {formError && (
-            <div className="p-3 rounded-lg bg-red-50 text-red-700 text-xs font-medium border border-red-200">
-              {formError}
+            <div className="p-3.5 rounded-lg bg-red-50 text-red-800 text-xs font-semibold border border-red-300 leading-relaxed shadow-2xs">
+              ⚠️ {formError}
             </div>
           )}
 

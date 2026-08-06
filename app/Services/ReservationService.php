@@ -7,6 +7,7 @@ use App\Contracts\DriverRepositoryInterface;
 use App\Contracts\ReservationRepositoryInterface;
 use App\Contracts\VehicleRepositoryInterface;
 use App\DTO\CreateReservationDTO;
+use App\Enums\ReservationStatus;
 use App\Models\Driver;
 use App\Models\Reservation;
 use App\Models\User;
@@ -51,7 +52,7 @@ class ReservationService
             ]);
         }
 
-        // Domain Rule: Vehicle and Driver MUST belong to the specified location
+        // Domain Rule 1: Vehicle and Driver MUST belong to the specified location
         $vehicle = Vehicle::findOrFail($dto->vehicleId);
         $driver = Driver::findOrFail($dto->driverId);
 
@@ -64,6 +65,44 @@ class ReservationService
         if ($driver->location_id !== $dto->locationId) {
             throw ValidationException::withMessages([
                 'driver_id' => ['Selected driver does not belong to the reservation location.'],
+            ]);
+        }
+
+        // Domain Rule 2: Vehicle Time-Slot Availability Check
+        $vehicleConflict = Reservation::where('vehicle_id', $dto->vehicleId)
+            ->where('status', '!=', ReservationStatus::REJECTED->value)
+            ->where(function ($q) use ($dto) {
+                $q->where('start_datetime', '<', $dto->endDatetime)
+                    ->where('end_datetime', '>', $dto->startDatetime);
+            })
+            ->first();
+
+        if ($vehicleConflict) {
+            $conflictStart = date('Y-m-d H:i', strtotime($vehicleConflict->start_datetime));
+            $conflictEnd = date('Y-m-d H:i', strtotime($vehicleConflict->end_datetime));
+            throw ValidationException::withMessages([
+                'vehicle_id' => [
+                    "Vehicle ({$vehicle->plate_number} - {$vehicle->brand} {$vehicle->model}) is already reserved for the selected time frame ({$conflictStart} to {$conflictEnd}) under reservation {$vehicleConflict->reservation_code}.",
+                ],
+            ]);
+        }
+
+        // Domain Rule 3: Driver Time-Slot Availability Check
+        $driverConflict = Reservation::where('driver_id', $dto->driverId)
+            ->where('status', '!=', ReservationStatus::REJECTED->value)
+            ->where(function ($q) use ($dto) {
+                $q->where('start_datetime', '<', $dto->endDatetime)
+                    ->where('end_datetime', '>', $dto->startDatetime);
+            })
+            ->first();
+
+        if ($driverConflict) {
+            $conflictStart = date('Y-m-d H:i', strtotime($driverConflict->start_datetime));
+            $conflictEnd = date('Y-m-d H:i', strtotime($driverConflict->end_datetime));
+            throw ValidationException::withMessages([
+                'driver_id' => [
+                    "Driver ({$driver->name}) is already assigned to another reservation for the selected time frame ({$conflictStart} to {$conflictEnd}) under reservation {$driverConflict->reservation_code}.",
+                ],
             ]);
         }
 

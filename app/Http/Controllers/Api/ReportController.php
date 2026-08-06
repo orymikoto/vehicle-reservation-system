@@ -17,6 +17,8 @@ class ReportController extends Controller
     {
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
+        $search = $request->query('search');
+        $status = $request->query('status');
         $locationIds = $request->query('location_ids', []);
 
         if (is_string($locationIds)) {
@@ -27,7 +29,9 @@ class ReportController extends Controller
             $request->user(),
             $startDate,
             $endDate,
-            $locationIds
+            $locationIds,
+            $search,
+            $status
         );
     }
 }

@@ -13,7 +13,9 @@ class ReservationsExport implements FromCollection, WithHeadings, WithMapping
         protected ?string $startDate = null,
         protected ?string $endDate = null,
         protected array $locationIds = [],
-        protected ?string $userLocationId = null
+        protected ?string $userLocationId = null,
+        protected ?string $search = null,
+        protected ?string $status = null
     ) {}
 
     public function collection()
@@ -32,6 +34,24 @@ class ReservationsExport implements FromCollection, WithHeadings, WithMapping
 
         if ($this->endDate) {
             $query->whereDate('end_datetime', '<=', $this->endDate);
+        }
+
+        if ($this->status) {
+            $query->where('status', $this->status);
+        }
+
+        if ($this->search) {
+            $searchTerm = '%'.strtolower($this->search).'%';
+            $query->where(function ($q) use ($searchTerm) {
+                $q->whereRaw('LOWER(reservation_code) LIKE ?', [$searchTerm])
+                    ->orWhereRaw('LOWER(purpose) LIKE ?', [$searchTerm])
+                    ->orWhereRaw('LOWER(destination) LIKE ?', [$searchTerm])
+                    ->orWhereHas('vehicle', function ($vq) use ($searchTerm) {
+                        $vq->whereRaw('LOWER(plate_number) LIKE ?', [$searchTerm])
+                            ->orWhereRaw('LOWER(brand) LIKE ?', [$searchTerm])
+                            ->orWhereRaw('LOWER(model) LIKE ?', [$searchTerm]);
+                    });
+            });
         }
 
         return $query->latest()->get();
